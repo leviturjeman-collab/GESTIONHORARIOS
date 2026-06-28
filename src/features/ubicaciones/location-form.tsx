@@ -134,12 +134,12 @@ export function LocationForm({
           </div>
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <Label>Apertura (Lunes a Viernes)</Label>
-              <Input value={form.horaApertura} onChange={(e) => set("horaApertura", e.target.value)} placeholder="09:00" />
+              <Label>{form.diferenteFinSemana ? "Apertura (Lunes a Viernes)" : "Hora de apertura (todos los días)"}</Label>
+              <Input type="time" value={form.horaApertura} onChange={(e) => set("horaApertura", e.target.value)} placeholder="09:00" />
             </div>
             <div className="space-y-1.5">
-              <Label>Cierre (Lunes a Viernes)</Label>
-              <Input value={form.horaCierre} onChange={(e) => set("horaCierre", e.target.value)} placeholder="23:00" />
+              <Label>{form.diferenteFinSemana ? "Cierre (Lunes a Viernes)" : "Hora de cierre (todos los días)"}</Label>
+              <Input type="time" value={form.horaCierre} onChange={(e) => set("horaCierre", e.target.value)} placeholder="23:00" />
             </div>
           </div>
 

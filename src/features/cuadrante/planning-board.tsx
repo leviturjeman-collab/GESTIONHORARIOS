@@ -42,6 +42,13 @@ import {
   SheetDescription,
 } from "@/components/ui/sheet";
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from "@/components/ui/dialog";
+import {
   Select,
   SelectTrigger,
   SelectValue,
@@ -168,7 +175,7 @@ export function PlanningBoard({
   }>(null);
   const [guardando, setGuardando] = useState(false);
 
-
+  const [confirmAiOpen, setConfirmAiOpen] = useState(false);
 
   // Plantillas
   const [templatesOpen, setTemplatesOpen] = useState(false);
@@ -353,12 +360,17 @@ export function PlanningBoard({
 
   async function publicar() {
     const res = await publicarCuadrante(ubicacionId, semanaISO);
-    res.ok ? toast.success("Cuadrante publicado · se ha avisado al administrador") : toast.error(res.error);
-    router.refresh();
+    if (res.ok) {
+      toast.success("Cuadrante publicado · Descargando Excel...");
+      router.refresh();
+      window.location.href = `/api/export/cuadrante?ubicacion=${ubicacionId}&semana=${semanaISO}`;
+    } else {
+      toast.error(res.error);
+    }
   }
 
   async function generarAuto() {
-    if (!window.confirm("¿Seguro que quieres generar el cuadrante automáticamente?\n\nSe cogerán los roles, horas, disponibilidades y se aplicarán las reglas de negocio de la calibración para generar el mejor horario posible.")) return;
+    setConfirmAiOpen(false);
 
     const p = (async () => {
       const res = await generarPreviewIA(
@@ -458,7 +470,7 @@ export function PlanningBoard({
         <Button
           variant="accent"
           size="sm"
-          onClick={generarAuto}
+          onClick={() => setConfirmAiOpen(true)}
         >
           <Sparkles /> Generar Automáticamente
         </Button>
@@ -716,6 +728,33 @@ export function PlanningBoard({
           )}
         </SheetContent>
       </Sheet>
+
+      <Dialog open={confirmAiOpen} onOpenChange={setConfirmAiOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-5 text-accent" />
+              <DialogTitle>Generar cuadrante</DialogTitle>
+            </div>
+            <DialogDescription>
+              El sistema utilizará la Inteligencia Artificial para crear el mejor horario posible.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <p className="text-sm">
+              ¿Seguro que quieres generar el cuadrante automáticamente?
+            </p>
+            <ul className="space-y-2 text-sm text-muted-foreground">
+              <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-success" /> Se cogerán los roles y horas.</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-success" /> Se respetarán las disponibilidades.</li>
+              <li className="flex items-center gap-2"><CheckCircle2 className="size-4 text-success" /> Se aplicarán las reglas de negocio.</li>
+            </ul>
+            <Button onClick={generarAuto} className="w-full mt-2" size="lg" variant="accent">
+              <Sparkles className="mr-2 size-4" /> Confirmar y generar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
 
 

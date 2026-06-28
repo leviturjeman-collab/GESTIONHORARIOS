@@ -162,5 +162,56 @@ export async function GET(req: NextRequest, { params }: { params: { tipo: string
     return excel("Fichajes", filas, `fichajes-${ahora.getFullYear()}-${ahora.getMonth() + 1}.xlsx`);
   }
 
+  // ── Cuadrante de la semana ──
+  if (params.tipo === "cuadrante") {
+    const semana = sp.get("semana");
+    if (!semana) return new Response("Semana requerida", { status: 400 });
+    const lunes = semanaDesdeParam(semana);
+    
+    const cuadrante = await prisma.cuadrante.findFirst({
+      where: { ubicacionId: { in: ambito }, semanaInicio: lunes },
+      include: { turnos: { include: { empleado: true } } },
+    });
+    
+    if (!cuadrante) return new Response("No hay cuadrante publicado", { status: 404 });
+    
+    const diasSemana = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+    const map = new Map<string, any>();
+    
+    for (const t of cuadrante.turnos) {
+      if (!t.empleado) continue;
+      if (!map.has(t.empleadoId)) {
+        map.set(t.empleadoId, {
+          Empleado: `${t.empleado.nombre} ${t.empleado.apellidos ?? ""}`.trim(),
+          Lunes: "", Martes: "", Miércoles: "", Jueves: "", Viernes: "", Sábado: "", Domingo: "",
+          "Total Horas": 0
+        });
+      }
+      
+      const row = map.get(t.empleadoId);
+      const diaIdx = t.dia.getDay() === 0 ? 7 : t.dia.getDay();
+      const diaStr = diasSemana[diaIdx - 1];
+      
+      let horario = `${t.horaInicio} - ${t.horaFin}`;
+      if (t.partido) horario += ` \r\n ${t.horaInicio2} - ${t.horaFin2}`;
+      
+      // If there are multiple shifts for the same day (rare), append them
+      if (row[diaStr]) {
+        row[diaStr] += ` \r\n ${horario}`;
+      } else {
+        row[diaStr] = horario;
+      }
+      
+      row["Total Horas"] += horasTurno(t);
+    }
+    
+    const filas = [...map.values()].map(r => ({
+      ...r,
+      "Total Horas": Math.round(r["Total Horas"] * 10) / 10
+    })).sort((a, b) => a.Empleado.localeCompare(b.Empleado));
+    
+    return excel("Cuadrante", filas, `cuadrante-${semana}.xlsx`);
+  }
+
   return new Response("Tipo de exportación no válido", { status: 404 });
 }
