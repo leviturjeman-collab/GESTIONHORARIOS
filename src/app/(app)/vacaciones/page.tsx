@@ -13,6 +13,7 @@ import { Badge } from "@/components/ui/badge";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { EmptyState } from "@/components/ui/empty-state";
 import { ResolveButtons } from "@/features/vacaciones/resolve-buttons";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 function diasInclusive(a: Date, b: Date) {
   return Math.round((b.getTime() - a.getTime()) / 86400000) + 1;
@@ -37,11 +38,11 @@ export default async function VacacionesPage({
     prisma.ausencia.findMany({
       where: {
         estado: "APROBADA",
-        tipo: "VACACIONES",
         empleado: { ubicacionId: { in: ambito } },
         fechaInicio: { gte: new Date(anio, 0, 1) },
       },
-      include: { empleado: { select: { id: true } } },
+      include: { empleado: { select: { id: true, nombre: true, apellidos: true, color: true } } },
+      orderBy: { fechaInicio: "asc" },
     }),
     prisma.empleado.findMany({
       where: { ubicacionId: { in: ambito }, estado: "ACTIVO" },
@@ -51,8 +52,10 @@ export default async function VacacionesPage({
 
   const usadoPorEmp = new Map<string, number>();
   for (const a of aprobadas) {
-    const k = a.empleado.id;
-    usadoPorEmp.set(k, (usadoPorEmp.get(k) ?? 0) + diasInclusive(a.fechaInicio, a.fechaFin));
+    if (a.tipo === "VACACIONES") {
+      const k = a.empleado.id;
+      usadoPorEmp.set(k, (usadoPorEmp.get(k) ?? 0) + diasInclusive(a.fechaInicio, a.fechaFin));
+    }
   }
 
   return (
@@ -97,8 +100,50 @@ export default async function VacacionesPage({
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
+      <Tabs defaultValue="historial" className="w-full">
+        <TabsList className="grid w-full grid-cols-2 mb-4">
+          <TabsTrigger value="historial">Historial de aprobadas</TabsTrigger>
+          <TabsTrigger value="saldos">Saldo de vacaciones</TabsTrigger>
+        </TabsList>
+        <TabsContent value="historial">
+          <Card>
+            <CardHeader>
+          <CardTitle>Historial de aprobadas · {anio}</CardTitle>
+        </CardHeader>
+        <CardContent>
+          {aprobadas.length === 0 ? (
+            <p className="py-6 text-center text-sm text-muted-foreground">
+              No hay vacaciones ni ausencias aprobadas para este año.
+            </p>
+          ) : (
+            <ul className="divide-y divide-border">
+              {aprobadas.map((a) => (
+                <li key={a.id} className="flex flex-wrap items-center gap-3 py-2.5">
+                  <Avatar nombre={iniciales(a.empleado.nombre, a.empleado.apellidos)} color={a.empleado.color ?? undefined} size={30} />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium">
+                      {a.empleado.nombre} {a.empleado.apellidos}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {fechaCorta(a.fechaInicio)} → {fechaCorta(a.fechaFin)} ·{" "}
+                      {diasInclusive(a.fechaInicio, a.fechaFin)} días
+                      {a.motivo ? ` · ${a.motivo}` : ""}
+                    </p>
+                  </div>
+                  <Badge variant="outline" className="text-[10px] uppercase">
+                    {a.tipo}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+      </TabsContent>
+
+      <TabsContent value="saldos">
+        <Card>
+          <CardHeader>
           <CardTitle>Saldo de vacaciones del equipo · {anio}</CardTitle>
         </CardHeader>
         <CardContent>
@@ -129,6 +174,8 @@ export default async function VacacionesPage({
           )}
         </CardContent>
       </Card>
+      </TabsContent>
+    </Tabs>
     </div>
   );
 }

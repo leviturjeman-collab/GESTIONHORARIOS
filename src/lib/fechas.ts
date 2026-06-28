@@ -46,19 +46,37 @@ export function semanaDesdeParam(param?: string | null): Date {
 
 export function rangoSemanaTexto(lunes: Date): string {
   const domingo = addDays(lunes, 6);
-  return `${format(lunes, "d MMM", { locale: es })} – ${format(domingo, "d MMM yyyy", {
-    locale: es,
-  })}`;
+  const yearFormatter = new Intl.DateTimeFormat("es-ES", { timeZone: "Europe/Madrid", year: "numeric" });
+  return `${fechaCorta(lunes)} – ${fechaCorta(domingo)} ${yearFormatter.format(domingo)}`;
 }
 
 export function fechaCorta(d: Date): string {
-  return format(d, "d MMM", { locale: es });
+  return new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    day: "numeric",
+    month: "short"
+  }).format(d);
 }
+
 export function fechaLarga(d: Date): string {
-  return format(d, "EEEE d 'de' MMMM 'de' yyyy", { locale: es });
+  const text = new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric"
+  }).format(d);
+  // 'lunes, 1 de enero de 2024' -> 'lunes 1 de enero de 2024' (if needed)
+  return text.replace(",", "");
 }
+
 export function horaTexto(d: Date): string {
-  return format(d, "HH:mm");
+  return new Intl.DateTimeFormat("es-ES", {
+    timeZone: "Europe/Madrid",
+    hour: "2-digit",
+    minute: "2-digit",
+    hour12: false
+  }).format(d);
 }
 
 export { isSameDay, format, addDays };
