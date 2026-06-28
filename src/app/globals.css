@@ -1,0 +1,109 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Neutros */
+    --background: 210 40% 99%;
+    --foreground: 222 47% 16%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 16%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 16%;
+    --muted: 214 32% 95%;
+    --muted-foreground: 215 18% 42%;
+    --border: 214 25% 90%;
+    --input: 214 25% 88%;
+
+    /* Azul corporativo profundo (color principal) */
+    --primary: 222 64% 30%;
+    --primary-foreground: 210 40% 99%;
+
+    /* Acento verde-azulado (teal) para acciones / indicadores positivos */
+    --accent: 175 68% 36%;
+    --accent-foreground: 0 0% 100%;
+
+    --secondary: 214 32% 95%;
+    --secondary-foreground: 222 47% 20%;
+
+    --ring: 222 64% 40%;
+
+    /* Estados */
+    --success: 152 58% 38%;
+    --success-foreground: 0 0% 100%;
+    --success-soft: 152 55% 94%;
+    --warning: 35 92% 48%;
+    --warning-foreground: 30 60% 12%;
+    --warning-soft: 42 96% 92%;
+    --danger: 0 72% 50%;
+    --danger-foreground: 0 0% 100%;
+    --danger-soft: 0 80% 96%;
+    --info: 215 25% 46%;
+    --info-foreground: 0 0% 100%;
+    --info-soft: 214 40% 95%;
+
+    --radius: 0.6rem;
+  }
+
+  .dark {
+    --background: 222 47% 9%;
+    --foreground: 210 40% 96%;
+    --card: 222 44% 12%;
+    --card-foreground: 210 40% 96%;
+    --popover: 222 44% 12%;
+    --popover-foreground: 210 40% 96%;
+    --muted: 217 33% 18%;
+    --muted-foreground: 215 20% 65%;
+    --border: 217 33% 20%;
+    --input: 217 33% 22%;
+
+    --primary: 213 80% 62%;
+    --primary-foreground: 222 47% 11%;
+    --accent: 175 60% 45%;
+    --accent-foreground: 222 47% 11%;
+    --secondary: 217 33% 18%;
+    --secondary-foreground: 210 40% 96%;
+    --ring: 213 80% 60%;
+
+    --success: 152 52% 45%;
+    --success-foreground: 0 0% 100%;
+    --success-soft: 152 40% 18%;
+    --warning: 35 90% 55%;
+    --warning-foreground: 30 60% 10%;
+    --warning-soft: 38 50% 18%;
+    --danger: 0 65% 58%;
+    --danger-foreground: 0 0% 100%;
+    --danger-soft: 0 40% 20%;
+    --info: 215 25% 60%;
+    --info-foreground: 222 47% 11%;
+    --info-soft: 215 30% 20%;
+  }
+
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground antialiased;
+    font-feature-settings: "cv02", "cv03", "cv04", "cv11";
+  }
+
+  /* Scrollbars discretas para las vistas densas de planificación */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+  ::-webkit-scrollbar-thumb {
+    @apply rounded-full bg-border;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-muted-foreground/40;
+  }
+}
+
+@layer components {
+  /* Tarjeta KPI con cifra grande */
+  .kpi-cifra {
+    @apply text-3xl font-semibold tracking-tight tabular-nums;
+  }
+}

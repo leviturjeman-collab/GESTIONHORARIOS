@@ -1,0 +1,44 @@
+# dependencias
+/node_modules
+/.pnp
+.pnp.js
+
+# next.js
+/.next/
+/out/
+next-env.d.ts
+
+# producción
+/build
+
+# base de datos local (SQLite)
+*.db
+*.db-journal
+/prisma/dev.db
+/prisma/migrations/dev.db
+
+# entorno
+.env
+.env*.local
+
+# logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# editores / SO
+.DS_Store
+*.pem
+.vscode/*
+!.vscode/extensions.json
+
+# tests
+/playwright-report/
+/test-results/
+/coverage
+
+# documentos subidos (almacenamiento local en desarrollo)
+/uploads
+
+# skills instaladas (agentes externos)
+/.agents

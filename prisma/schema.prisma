@@ -1,0 +1,385 @@
+// Gestión Horarios — esquema de datos
+// ------------------------------------------------------------------
+// Proveedor: SQLite en desarrollo (cero configuración local).
+// Para PostgreSQL en producción: cambiar `provider = "postgresql"` y
+// `DATABASE_URL`, y convertir los campos String marcados como «enum
+// lógico» en enums nativos. Los valores permitidos se validan en la
+// capa de aplicación con Zod (src/lib/enums.ts), por lo que el
+// comportamiento es idéntico en ambos motores.
+// ------------------------------------------------------------------
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+// ─────────────────────────────── Organización ───────────────────────────────
+
+model Organizacion {
+  id        String   @id @default(cuid())
+  nombre    String
+  // Configuración global (JSON): preferencias de notificación, etc.
+  ajustes   String   @default("{}")
+  creadoEn  DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  ubicaciones Ubicacion[]
+  usuarios    Usuario[]
+  empleados   Empleado[]
+  notificaciones Notificacion[]
+}
+
+// ─────────────────────────────── Ubicación ──────────────────────────────────
+
+model Ubicacion {
+  id             String   @id @default(cuid())
+  organizacionId String
+  nombre         String
+  direccion      String?
+  // Geolocalización del local para el fichaje por proximidad.
+  lat            Float?
+  lng            Float?
+  radioFichajeMetros Int  @default(100)
+  zonaHoraria    String   @default("Europe/Madrid")
+  horaApertura   String   @default("08:00") // "HH:mm"
+  horaCierre     String   @default("23:00") // "HH:mm"
+  // Regla configurable: ¿los cambios de turno requieren aprobación del responsable?
+  requiereAprobacionCambios Boolean @default(true)
+  activa         Boolean  @default(true)
+  ajustes        String   @default("{}")
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
+
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  empleados      Empleado[]
+  cuadrantes     Cuadrante[]
+  plantillas     Plantilla[]
+  coberturas     CoberturaMinima[]
+  managers       Usuario[]    @relation("ManagerUbicaciones")
+
+  @@index([organizacionId])
+}
+
+// Cobertura mínima por rol y franja para una ubicación.
+model CoberturaMinima {
+  id          String  @id @default(cuid())
+  ubicacionId String
+  rol         String  // rol funcional (camarero, cocina, barra…)
+  diaSemana   Int?    // 0=lunes … 6=domingo; null = todos los días
+  franjaInicio String // "HH:mm"
+  franjaFin    String // "HH:mm"
+  minPersonas Int     @default(1)
+
+  ubicacion   Ubicacion @relation(fields: [ubicacionId], references: [id], onDelete: Cascade)
+
+  @@index([ubicacionId])
+}
+
+// ─────────────────────────────── Usuario (acceso) ───────────────────────────
+
+model Usuario {
+  id             String   @id @default(cuid())
+  organizacionId String
+  email          String   @unique
+  nombre         String
+  passwordHash   String
+  rol            String   @default("EMPLEADO") // enum lógico: ADMIN | MANAGER | EMPLEADO
+  activo         Boolean  @default(true)
+  // Token de invitación (alta de empleado por correo)
+  tokenInvitacion String? @unique
+  invitacionExpira DateTime?
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
+
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  empleado       Empleado?    // 1-1 cuando el usuario es un empleado
+  ubicacionesGestionadas Ubicacion[] @relation("ManagerUbicaciones")
+  notificaciones Notificacion[]
+
+  @@index([organizacionId])
+}
+
+// ─────────────────────────────── Empleado ───────────────────────────────────
+
+model Empleado {
+  id             String   @id @default(cuid())
+  organizacionId String
+  ubicacionId    String?
+  usuarioId      String?  @unique // vinculado a una cuenta de acceso (si fue invitado)
+  nombre         String
+  apellidos      String?
+  email          String?
+  telefono       String?
+  rolFuncional   String   @default("camarero") // camarero, cocina, barra, encargado…
+  estado         String   @default("ACTIVO")   // enum lógico: ACTIVO | INVITADO | INACTIVO
+  origenDato     String   @default("MANUAL")   // enum lógico: IMPORTADO | MANUAL
+  saldoVacaciones Int     @default(30)         // días por año natural
+  pinFichaje     String?  // PIN de 4 dígitos para el modo tablet del local
+  color          String?  // color de avatar (derivado del rol si null)
+  creadoEn       DateTime @default(now())
+  actualizadoEn  DateTime @updatedAt
+
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  ubicacion      Ubicacion?   @relation(fields: [ubicacionId], references: [id], onDelete: SetNull)
+  usuario        Usuario?     @relation(fields: [usuarioId], references: [id], onDelete: SetNull)
+
+  contrato        Contrato?
+  turnos          Turno[]
+  disponibilidades Disponibilidad[]
+  ausencias       Ausencia[]
+  fichajes        Fichaje[]
+  documentos      Documento[]
+  cambiosSolicitados CambioTurno[] @relation("Solicitante")
+  cambiosRecibidos   CambioTurno[] @relation("Destino")
+
+  @@index([organizacionId])
+  @@index([ubicacionId])
+}
+
+// ─────────────────────────────── Contrato ───────────────────────────────────
+
+model Contrato {
+  id          String   @id @default(cuid())
+  empleadoId  String   @unique
+  // enum lógico TipoContrato (ver src/lib/enums.ts): INDEFINIDO_COMPLETO,
+  // INDEFINIDO_PARCIAL, TEMPORAL_COMPLETO, TEMPORAL_PARCIAL, FIJO_DISCONTINUO,
+  // FORMACION, POR_HORAS, RELEVO
+  tipo        String   @default("INDEFINIDO_COMPLETO")
+  horasSemana Float    @default(40)
+  costeHora   Float    @default(0)
+  admiteHorasExtra Boolean @default(true)
+  diasDescanso Int     @default(2)
+  preferenciaTurno String @default("INDIFERENTE")
+  permitePartido   Boolean @default(true)
+  fechaInicio DateTime @default(now())
+  fechaFin    DateTime?
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────── Cuadrante ──────────────────────────────────
+
+model Cuadrante {
+  id            String   @id @default(cuid())
+  ubicacionId   String
+  semanaInicio  DateTime // lunes de la semana (00:00 zona local)
+  estado        String   @default("BORRADOR") // enum lógico: BORRADOR | PUBLICADO | BLOQUEADO
+  origen        String   @default("MANUAL")    // enum lógico: IMPORTADO | GENERADO_IA | MANUAL
+  // Copia de los turnos previos a la última aplicación de IA (para deshacer).
+  snapshotAnterior String?
+  publicadoEn   DateTime?
+  autorId       String?  // usuario que hizo el último cambio sensible (auditoría)
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  ubicacion     Ubicacion @relation(fields: [ubicacionId], references: [id], onDelete: Cascade)
+  turnos        Turno[]
+
+  @@unique([ubicacionId, semanaInicio])
+  @@index([ubicacionId])
+}
+
+// ─────────────────────────────── Turno ──────────────────────────────────────
+
+model Turno {
+  id          String   @id @default(cuid())
+  cuadranteId String
+  empleadoId  String
+  dia         DateTime // fecha del turno (00:00 local)
+  horaInicio  String   // "HH:mm"
+  horaFin     String   // "HH:mm"
+  rol         String   // rol funcional cubierto en este turno
+  partido     Boolean  @default(false)
+  // Segundo tramo cuando el turno es partido:
+  horaInicio2 String?
+  horaFin2    String?
+  descansoMin Int      @default(0) // minutos de descanso no computables
+  notas       String?
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  cuadrante   Cuadrante @relation(fields: [cuadranteId], references: [id], onDelete: Cascade)
+  empleado    Empleado  @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  fichajes    Fichaje[]
+  cambios     CambioTurno[] @relation("TurnoOrigen")
+
+  @@index([cuadranteId])
+  @@index([empleadoId])
+}
+
+// ─────────────────────────────── Plantilla recurrente ───────────────────────
+
+model Plantilla {
+  id          String   @id @default(cuid())
+  ubicacionId String
+  nombre      String
+  // Patrón de la semana (JSON): turnos por empleado/día sin fechas absolutas.
+  datos       String   @default("[]")
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  ubicacion   Ubicacion @relation(fields: [ubicacionId], references: [id], onDelete: Cascade)
+
+  @@index([ubicacionId])
+}
+
+// ─────────────────────────────── Disponibilidad ─────────────────────────────
+
+model Disponibilidad {
+  id          String   @id @default(cuid())
+  empleadoId  String
+  recurrente  Boolean  @default(true)
+  diaSemana   Int?     // 0=lunes … 6=domingo (para recurrente)
+  fecha       DateTime? // fecha concreta (para excepciones)
+  franjaInicio String  @default("00:00")
+  franjaFin    String  @default("23:59")
+  estado      String   @default("DISPONIBLE") // enum lógico: DISPONIBLE | PREFIERE_NO | NO_DISPONIBLE
+  notas       String?
+  activa      Boolean  @default(true)
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+}
+
+// ─────────────────────────────── Ausencia (vacaciones / baja) ───────────────
+
+model Ausencia {
+  id          String   @id @default(cuid())
+  empleadoId  String
+  tipo        String   // enum lógico: VACACIONES | AUSENCIA | BAJA
+  estado      String   @default("PENDIENTE") // enum lógico: PENDIENTE | APROBADA | RECHAZADA
+  fechaInicio DateTime
+  fechaFin    DateTime
+  motivo      String?
+  comentarioResolucion String?
+  // Justificante de baja (dato de salud) — acceso restringido.
+  justificanteDocId String?
+  resueltoPorId String? // usuario que aprobó/rechazó (auditoría)
+  resueltoEn  DateTime?
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+}
+
+// ─────────────────────────────── Cambio de turno ────────────────────────────
+
+model CambioTurno {
+  id            String   @id @default(cuid())
+  turnoOrigenId String
+  solicitanteId String
+  destinoId     String?  // empleado al que se ofrece / con quien se cambia
+  // enum lógico: PROPUESTO | ACEPTADO | PENDIENTE_APROBACION | CONFIRMADO | RECHAZADO
+  estado        String   @default("PROPUESTO")
+  mensaje       String?
+  aprobadoPorId String?
+  creadoEn      DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  turnoOrigen   Turno    @relation("TurnoOrigen", fields: [turnoOrigenId], references: [id], onDelete: Cascade)
+  solicitante   Empleado @relation("Solicitante", fields: [solicitanteId], references: [id], onDelete: Cascade)
+  destino       Empleado? @relation("Destino", fields: [destinoId], references: [id], onDelete: SetNull)
+
+  @@index([turnoOrigenId])
+  @@index([solicitanteId])
+}
+
+// ─────────────────────────────── Fichaje (control horario) ──────────────────
+
+model Fichaje {
+  id          String   @id @default(cuid())
+  empleadoId  String
+  turnoId     String?
+  entrada     DateTime
+  salida      DateTime?
+  // Descansos como JSON: [{ inicio, fin }]
+  descansos   String   @default("[]")
+  // Geolocalización del fichaje (control de fichaje por proximidad).
+  lat         Float?
+  lng         Float?
+  dentroDeRadio Boolean?
+  incidencia  String?  // enum lógico: ENTRADA_TARDE | SALIDA_TEMPRANA | SIN_FICHAR | FUERA_DE_RADIO | null
+  corregido   Boolean  @default(false)
+  // Conserva el dato original cuando se corrige (auditoría / RGPD).
+  datosOriginales String?
+  corregidoPorId String?
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+  turno       Turno?   @relation(fields: [turnoId], references: [id], onDelete: SetNull)
+
+  @@index([empleadoId])
+}
+
+// ─────────────────────────────── Documento (contrato / nómina) ──────────────
+
+model Documento {
+  id          String   @id @default(cuid())
+  empleadoId  String
+  tipo        String   // enum lógico: CONTRATO | NOMINA | JUSTIFICANTE
+  nombre      String
+  ruta        String   // ruta/URL del PDF almacenado
+  // Acceso restringido (justificantes de baja = datos de salud).
+  restringido Boolean  @default(false)
+  subidoPorId String?
+  enviadoEn   DateTime?
+  creadoEn    DateTime @default(now())
+  actualizadoEn DateTime @updatedAt
+
+  empleado    Empleado @relation(fields: [empleadoId], references: [id], onDelete: Cascade)
+
+  @@index([empleadoId])
+}
+
+// ─────────────────────────────── Notificación ───────────────────────────────
+
+model Notificacion {
+  id             String   @id @default(cuid())
+  organizacionId String
+  destinatarioId String
+  tipo           String   // enum lógico: ver TipoNotificacion en src/lib/enums.ts
+  titulo         String
+  cuerpo         String
+  enlace         String?
+  leida          Boolean  @default(false)
+  // ¿Se envió el correo asociado?
+  emailEnviado   Boolean  @default(false)
+  creadoEn       DateTime @default(now())
+
+  organizacion   Organizacion @relation(fields: [organizacionId], references: [id], onDelete: Cascade)
+  destinatario   Usuario      @relation(fields: [destinatarioId], references: [id], onDelete: Cascade)
+
+  @@index([destinatarioId])
+}
+
+// ─────────────────────────────── Consumo de IA ──────────────────────────────
+// Registro de cada llamada a la API de Anthropic: tokens y coste estimado.
+
+model UsoIA {
+  id             String   @id @default(cuid())
+  organizacionId String
+  ubicacionId    String?
+  // enum lógico OperacionIA: ANALISIS | GENERACION | DETECCION | ASISTENTE
+  operacion      String
+  modelo         String
+  tokensEntrada  Int      @default(0)
+  tokensSalida   Int      @default(0)
+  costeEur       Float    @default(0)
+  creadoEn       DateTime @default(now())
+
+  @@index([organizacionId])
+  @@index([creadoEn])
+}
