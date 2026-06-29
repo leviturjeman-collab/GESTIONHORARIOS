@@ -109,6 +109,8 @@ export default async function CuadrantesPage({
     dias
   );
 
+  const esModoTodas = !searchParams.ubicacion && ambito.length > 1;
+
   return (
     <div className="space-y-6">
       <PageHeader
