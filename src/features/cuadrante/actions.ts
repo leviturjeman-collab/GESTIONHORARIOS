@@ -6,7 +6,7 @@ import { prisma } from "@/lib/prisma";
 import { requireResponsable, puedeUbicacion, fallo, type Resultado } from "@/lib/guards";
 import { turnoSchema } from "@/lib/validators/turno";
 import { getOrCreateCuadrante } from "@/lib/cuadrante";
-import { lunesDeSemana, diasDeSemana } from "@/lib/fechas";
+import { lunesDeSemana, diasDeSemana, dateToISOLocal } from "@/lib/fechas";
 import { detectarProblemas, type Problema } from "@/lib/detector";
 import { generarTurnosIA, type TurnoPropuesto, type ContextoGeneracion } from "@/lib/ai/cuadrante";
 import { notificarAdmins, notificarUsuario } from "@/lib/notificaciones";
@@ -249,8 +249,11 @@ export async function generarPreviewIA(
         if (d.diaSemana != null) noDisp.add(d.diaSemana);
       }
       for (const a of ausencias.filter((x) => x.empleadoId === e.id)) {
+        const aInicioStr = dateToISOLocal(a.fechaInicio);
+        const aFinStr = dateToISOLocal(a.fechaFin);
         dias.forEach((dia, idx) => {
-          if (dia >= startDay(a.fechaInicio) && dia <= a.fechaFin) noDisp.add(idx);
+          const dStr = dateToISOLocal(dia);
+          if (dStr >= aInicioStr && dStr <= aFinStr) noDisp.add(idx);
         });
       }
       // Agregar los días de cierre de la ubicación
@@ -382,7 +385,7 @@ export async function aplicarPreviewIA(
   const snapshot = JSON.stringify(
     actuales.map((t) => ({
       empleadoId: t.empleadoId,
-      diaIdx: Math.round((startDay(t.dia).getTime() - lunes.getTime()) / 86400000),
+      diaIdx: Math.round((new Date(dateToISOLocal(t.dia)).getTime() - new Date(dateToISOLocal(lunes)).getTime()) / 86400000),
       horaInicio: t.horaInicio,
       horaFin: t.horaFin,
       rol: t.rol,
@@ -615,7 +618,7 @@ export async function aplicarPlantilla(
   });
   const bloqueado = (empId: string, idx: number) =>
     ausencias.some(
-      (a) => a.empleadoId === empId && dias[idx] >= startDay(a.fechaInicio) && dias[idx] <= a.fechaFin
+      (a) => a.empleadoId === empId && dateToISOLocal(dias[idx]) >= dateToISOLocal(a.fechaInicio) && dateToISOLocal(dias[idx]) <= dateToISOLocal(a.fechaFin)
     );
 
   await prisma.$transaction([
@@ -836,8 +839,4 @@ export async function toggleDisponibilidadActivaAction(
   return { ok: true };
 }
 
-function startDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
+

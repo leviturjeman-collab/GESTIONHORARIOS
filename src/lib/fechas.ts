@@ -8,6 +8,16 @@ import {
 } from "date-fns";
 import { es } from "date-fns/locale";
 
+/** Formats a Date object to YYYY-MM-DD in Europe/Madrid timezone */
+export function dateToISOLocal(d: Date): string {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone: "Europe/Madrid",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  }).format(d);
+}
+
 /** Lunes (00:00) de la semana que contiene `fecha`. Semana europea (lunes). */
 export function lunesDeSemana(fecha: Date = new Date()): Date {
   const d = startOfWeek(fecha, { weekStartsOn: 1 });

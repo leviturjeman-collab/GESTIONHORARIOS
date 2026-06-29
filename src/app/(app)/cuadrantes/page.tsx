@@ -4,7 +4,7 @@ import { CalendarRange } from "lucide-react";
 import { requireSesion, resolverAmbito } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { esResponsable } from "@/lib/rbac";
-import { semanaDesdeParam, diasDeSemana } from "@/lib/fechas";
+import { semanaDesdeParam, diasDeSemana, dateToISOLocal } from "@/lib/fechas";
 import { evaluarCobertura } from "@/lib/cuadrante";
 import { PageHeader } from "@/components/layout/page-header";
 import { WeekSelector } from "@/components/layout/week-selector";
@@ -38,7 +38,7 @@ export default async function CuadrantesPage({
   const lunes = semanaDesdeParam(searchParams.semana);
   const dias = diasDeSemana(lunes);
   const semanaISO = format(lunes, "yyyy-MM-dd");
-  const diasISO = dias.map((d) => format(d, "yyyy-MM-dd"));
+  const diasISO = dias.map((d) => dateToISOLocal(d));
 
   const [ubic, empleados, cuadrante, reglas, plantillas, ausencias, disponibilidades] = await Promise.all([
     prisma.ubicacion.findUnique({ where: { id: ubicacionId } }),
@@ -73,16 +73,20 @@ export default async function CuadrantesPage({
   ]);
 
   const turnos = cuadrante?.turnos ?? [];
-  const diaIdxDe = (d: Date) => Math.round((startDay(d).getTime() - lunes.getTime()) / 86400000);
+  const diaIdxDe = (d: Date) => Math.round((new Date(dateToISOLocal(d)).getTime() - new Date(dateToISOLocal(lunes)).getTime()) / 86400000);
 
   // Recomendaciones y bloqueos por ausencia aprobada
-  const bloqueos: { empleadoId: string; diaIdx: number }[] = [];
+  const bloqueos: { empleadoId: string; diaIdx: number; tipo: string }[] = [];
   const recomendaciones = ausencias.map((a) => {
     const idxs: number[] = [];
+    const aInicioStr = dateToISOLocal(a.fechaInicio);
+    const aFinStr = dateToISOLocal(a.fechaFin);
+
     dias.forEach((d, i) => {
-      if (d >= startDay(a.fechaInicio) && d <= a.fechaFin) {
+      const dStr = dateToISOLocal(d);
+      if (dStr >= aInicioStr && dStr <= aFinStr) {
         idxs.push(i);
-        bloqueos.push({ empleadoId: a.empleadoId, diaIdx: i });
+        bloqueos.push({ empleadoId: a.empleadoId, diaIdx: i, tipo: a.tipo });
       }
     });
     return {
@@ -160,8 +164,4 @@ export default async function CuadrantesPage({
   );
 }
 
-function startDay(d: Date) {
-  const x = new Date(d);
-  x.setHours(0, 0, 0, 0);
-  return x;
-}
+

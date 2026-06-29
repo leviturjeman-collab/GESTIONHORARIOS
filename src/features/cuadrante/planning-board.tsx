@@ -128,7 +128,7 @@ export function PlanningBoard({
   plantillas: { id: string; nombre: string }[];
   diasISO: string[];
   recomendaciones: { empleadoId: string; nombre: string; tipo: string; diasIdx: number[] }[];
-  bloqueos: { empleadoId: string; diaIdx: number }[];
+  bloqueos: { empleadoId: string; diaIdx: number; tipo?: string }[];
   puedeDeshacer: boolean;
   ubicacionAjustes: string;
   ubicHoraApertura: string;
@@ -137,7 +137,7 @@ export function PlanningBoard({
 }) {
   const router = useRouter();
   const bloqueado = estado === "BLOQUEADO";
-  const celdaBloqueada = new Set(bloqueos.map((b) => `${b.empleadoId}-${b.diaIdx}`));
+  const celdaBloqueada = new Map(bloqueos.map((b) => [`${b.empleadoId}-${b.diaIdx}`, b.tipo || "AUSENCIA"]));
   const sensores = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
 
   async function onDragEnd(ev: DragEndEvent) {
@@ -149,7 +149,7 @@ export function PlanningBoard({
     if (!turno) return;
     if (turno.empleadoId === empleadoId && turno.diaIdx === diaIdx) return; // sin cambio
     if (celdaBloqueada.has(`${empleadoId}-${diaIdx}`)) {
-      toast.error("Ese día el empleado tiene una ausencia aprobada.");
+      toast.error(`Ese día el empleado tiene: ${celdaBloqueada.get(`${empleadoId}-${diaIdx}`)}.`);
       return;
     }
     const res = await moverTurno(turnoId, empleadoId, diasISO[diaIdx]);
@@ -598,12 +598,13 @@ export function PlanningBoard({
                 </div>
                 {Array.from({ length: 7 }).map((_, dia) => {
                   const celdas = celdasOrden(turnosDe(e.id, dia));
-                  const ausente = celdaBloqueada.has(`${e.id}-${dia}`);
+                  const ausenteTipo = celdaBloqueada.get(`${e.id}-${dia}`);
                   return (
                     <Celda
                       key={dia}
                       id={`${e.id}|${dia}`}
-                      ausente={ausente}
+                      ausente={!!ausenteTipo}
+                      ausenteTipo={ausenteTipo}
                       vacio={celdas.length === 0}
                       bloqueado={bloqueado}
                       onNuevo={() => nuevoTurno(e.id, dia)}
@@ -824,6 +825,7 @@ function celdasOrden(t: Turno[]) {
 function Celda({
   id,
   ausente,
+  ausenteTipo,
   vacio,
   bloqueado,
   onNuevo,
@@ -831,6 +833,7 @@ function Celda({
 }: {
   id: string;
   ausente: boolean;
+  ausenteTipo?: string;
   vacio: boolean;
   bloqueado: boolean;
   onNuevo: () => void;
@@ -849,8 +852,8 @@ function Celda({
     >
       {ausente && vacio ? (
         <div className="flex h-full w-full items-center justify-center">
-          <span className="flex items-center gap-1 text-[11px] font-medium text-warning-foreground/70">
-            <Plane className="size-3" /> Ausencia
+          <span className="flex items-center gap-1 text-[11px] font-medium text-warning-foreground/70 truncate px-1">
+            <Plane className="size-3 shrink-0" /> {ausenteTipo === "VACACIONES" ? "Vacaciones" : ausenteTipo === "BAJA" ? "Baja" : "Ausencia"}
           </span>
         </div>
       ) : vacio ? (
