@@ -52,14 +52,14 @@ export function LocationSelector({
         <DropdownMenuLabel>Ubicación</DropdownMenuLabel>
         {permitirTodas && (
           <>
-            <DropdownMenuItem onClick={() => seleccionar("todas")}>
+            <DropdownMenuItem onSelect={() => seleccionar("todas")}>
               Todas las ubicaciones
             </DropdownMenuItem>
             <DropdownMenuSeparator />
           </>
         )}
         {ubicaciones.map((u) => (
-          <DropdownMenuItem key={u.id} onClick={() => seleccionar(u.id)}>
+          <DropdownMenuItem key={u.id} onSelect={() => seleccionar(u.id)}>
             {u.nombre}
           </DropdownMenuItem>
         ))}
