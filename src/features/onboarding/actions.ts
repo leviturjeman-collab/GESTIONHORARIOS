@@ -182,6 +182,7 @@ export async function confirmarOnboarding(input: {
     cierreFinSemana: string;
     diasCierre: number[];
   };
+  ubicacionIdExistente?: string;
 }): Promise<Resultado<{ ubicacionId: string }>> {
   const u = await requireResponsable();
   if (!input.nombreUbicacion?.trim()) return fallo("Pon un nombre a la ubicación");
@@ -191,8 +192,9 @@ export async function confirmarOnboarding(input: {
   const org = await prisma.organizacion.findUnique({ where: { id: u.organizacionId } });
   const ajustes = JSON.parse(org?.ajustes || "{}");
   ajustes.rolesTurnoPartido = input.rolesTurnoPartido || [];
-  if (input.preguntasGeneradas) {
-    ajustes.preguntasOnboarding = input.preguntasGeneradas;
+  const preguntas = input.preguntasGeneradas || input.preguntas;
+  if (preguntas) {
+    ajustes.preguntasOnboarding = preguntas;
   }
   // No guardamos respuestasOnboarding todavía, se guardan en calibración
   ajustes.horarioCustom = input.horarioCustom || null;
@@ -203,21 +205,41 @@ export async function confirmarOnboarding(input: {
 
   const ubicAjustes = {
     rolesTurnoPartido: input.rolesTurnoPartido || [],
-    preguntasOnboarding: input.preguntasGeneradas || [],
+    preguntasOnboarding: input.preguntasGeneradas || input.preguntas || [],
     horarioCustom: input.horarioCustom || null,
   };
 
-  const ubic = await prisma.ubicacion.create({
-    data: {
-      organizacionId: u.organizacionId,
-      nombre: input.nombreUbicacion.trim(),
-      direccion: input.direccion || null,
-      horaApertura: input.horaApertura || "09:00",
-      horaCierre: input.horaCierre || "23:00",
-      ajustes: JSON.stringify(ubicAjustes),
-      managers: u.rol === "MANAGER" ? { connect: { id: u.id } } : undefined,
-    },
-  });
+  let ubic;
+  if (input.ubicacionIdExistente) {
+    const existingUbic = await prisma.ubicacion.findUnique({ where: { id: input.ubicacionIdExistente } });
+    const existingAjustes = JSON.parse(existingUbic?.ajustes || "{}");
+    const mergedAjustes = {
+      ...existingAjustes,
+      rolesTurnoPartido: ubicAjustes.rolesTurnoPartido,
+      preguntasOnboarding: ubicAjustes.preguntasOnboarding,
+      horarioCustom: ubicAjustes.horarioCustom,
+    };
+    ubic = await prisma.ubicacion.update({
+      where: { id: input.ubicacionIdExistente },
+      data: {
+        ajustes: JSON.stringify(mergedAjustes),
+      },
+    });
+  } else {
+    ubic = await prisma.ubicacion.create({
+      data: {
+        organizacionId: u.organizacionId,
+        nombre: input.nombreUbicacion.trim(),
+        direccion: input.direccion || null,
+        horaApertura: input.horaApertura || "09:00",
+        horaCierre: input.horaCierre || "23:00",
+        ajustes: JSON.stringify(ubicAjustes),
+        managers: u.rol === "MANAGER" ? { connect: { id: u.id } } : undefined,
+      },
+    });
+  }
+
+  const existingEmployees = await prisma.empleado.findMany({ where: { ubicacionId: ubic.id } });
 
   const creados = await prisma.$transaction(
     input.empleados.map((e) => {
@@ -267,6 +289,21 @@ export async function confirmarOnboarding(input: {
           estado: "NO_DISPONIBLE",
           notas: "Restricción de horario indicada en onboarding",
         };
+      }
+
+      const exist = existingEmployees.find(ex => 
+        ex.nombre.toLowerCase() === nombre.toLowerCase() && 
+        (ex.apellidos || "").toLowerCase() === resto.join(" ").toLowerCase()
+      );
+
+      if (exist) {
+        return prisma.empleado.update({
+          where: { id: exist.id },
+          data: {
+            rolFuncional: e.rol,
+            color: colorDeRol(e.rol),
+          }
+        });
       }
 
       return prisma.empleado.create({

@@ -23,13 +23,19 @@ export default async function OnboardingPage() {
   const resumen = resumenUsoIA(usos);
   const costeMes = usos.filter((u) => u.creadoEn >= inicioMes).reduce((a, u) => a + u.costeEur, 0);
 
+  const ubicacionesExistentes = await prisma.ubicacion.findMany({
+    where: { organizacionId: usuario.organizacionId },
+    select: { id: true, nombre: true },
+    orderBy: { nombre: "asc" }
+  });
+
   return (
     <div className="mx-auto max-w-4xl space-y-6">
       <PageHeader
         titulo="Insertar cuadrante actual"
         descripcion="Sube el cuadrante que ya usas. El sistema lo analiza, te hace unas preguntas y genera tu cuadrante mejorado."
       />
-      <OnboardingWizard />
+      <OnboardingWizard ubicacionesExistentes={ubicacionesExistentes} />
 
       {/* Panel de consumo del sistema */}
       <Card>

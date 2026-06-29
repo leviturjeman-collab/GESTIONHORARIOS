@@ -35,7 +35,11 @@ import type { EmpleadoDetectado, ResultadoAnalisis } from "@/lib/ai/onboarding";
 
 const PASOS = ["Subir", "Analizar", "Revisar", "Confirmar"];
 
-export function OnboardingWizard() {
+export function OnboardingWizard({
+  ubicacionesExistentes = [],
+}: {
+  ubicacionesExistentes?: { id: string; nombre: string }[];
+}) {
   const router = useRouter();
   const [paso, setPaso] = useState(0);
   const [archivo, setArchivo] = useState<File | null>(null);
@@ -61,11 +65,12 @@ export function OnboardingWizard() {
     diasCierre: [] as number[],
   });
   const [ubic, setUbic] = useState({
+    id: "",
     nombre: "",
     direccion: "",
     horaApertura: "09:00",
     horaCierre: "23:00",
-    generarCuadrante: true,
+    generarCuadrante: false,
   });
 
   async function analizar() {
@@ -199,6 +204,7 @@ export function OnboardingWizard() {
       });
 
       const res = await confirmarOnboarding({
+        ubicacionIdExistente: ubic.id || undefined,
         nombreUbicacion: ubic.nombre,
         direccion: ubic.direccion,
         horaApertura: ubic.horaApertura,
@@ -466,14 +472,44 @@ export function OnboardingWizard() {
                 para crear.
               </div>
               <div className="grid gap-3 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                  <Label>Nombre de la ubicación</Label>
-                  <Input
-                    value={ubic.nombre}
-                    onChange={(e) => setUbic({ ...ubic, nombre: e.target.value })}
-                    placeholder="Restaurante Centro"
-                  />
+                <div className="space-y-1.5 sm:col-span-2">
+                  <Label>Ubicación de destino</Label>
+                  <Select
+                    value={ubic.id || "nueva"}
+                    onValueChange={(v) => {
+                      if (v === "nueva") {
+                        setUbic({ ...ubic, id: "", nombre: "" });
+                      } else {
+                        const existe = ubicacionesExistentes.find((x) => x.id === v);
+                        if (existe) setUbic({ ...ubic, id: v, nombre: existe.nombre });
+                      }
+                    }}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Selecciona..." />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="nueva">✨ Crear nueva ubicación</SelectItem>
+                      {ubicacionesExistentes.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>
+                          {u.nombre}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
+
+                {!ubic.id && (
+                  <div className="space-y-1.5">
+                    <Label>Nombre de la nueva ubicación</Label>
+                    <Input
+                      value={ubic.nombre}
+                      onChange={(e) => setUbic({ ...ubic, nombre: e.target.value })}
+                      placeholder="Restaurante Centro"
+                    />
+                  </div>
+                )}
+                
                 <div className="space-y-1.5">
                   <Label>Dirección</Label>
                   <Input

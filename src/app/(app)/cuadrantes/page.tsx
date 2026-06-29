@@ -159,6 +159,7 @@ export default async function CuadrantesPage({
         ubicHoraApertura={ubic?.horaApertura ?? "09:00"}
         ubicHoraCierre={ubic?.horaCierre ?? "23:00"}
         disponibilidades={disponibilidades}
+        esModoTodas={esModoTodas}
       />
     </div>
   );

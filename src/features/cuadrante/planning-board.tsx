@@ -134,6 +134,7 @@ export function PlanningBoard({
   ubicHoraApertura: string;
   ubicHoraCierre: string;
   disponibilidades: any[];
+  esModoTodas?: boolean;
 }) {
   const router = useRouter();
   const bloqueado = estado === "BLOQUEADO";
@@ -451,10 +452,12 @@ export function PlanningBoard({
 
   return (
     <Tabs defaultValue="planificacion" className="w-full space-y-4">
-      <TabsList className="grid w-full max-w-[400px] grid-cols-2">
-        <TabsTrigger value="planificacion">Planificación</TabsTrigger>
-        <TabsTrigger value="calibracion">Calibración</TabsTrigger>
-      </TabsList>
+      {esModoTodas ? null : (
+        <TabsList className="grid w-full max-w-[400px] grid-cols-2">
+          <TabsTrigger value="planificacion">Planificación</TabsTrigger>
+          <TabsTrigger value="calibracion">Calibración</TabsTrigger>
+        </TabsList>
+      )}
 
       <TabsContent value="planificacion" className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -636,16 +639,19 @@ export function PlanningBoard({
       </DndContext>
       </TabsContent>
 
-      <TabsContent value="calibracion" className="space-y-4">
-        <CalibracionIA
-          ubicacionId={ubicacionId}
-          ajustesJson={ubicacionAjustes}
-          horaApertura={ubicHoraApertura}
-          horaCierre={ubicHoraCierre}
-          empleados={empleados}
-          disponibilidades={disponibilidades}
-        />
-      </TabsContent>
+      {!esModoTodas && (
+        <TabsContent value="calibracion" className="space-y-4">
+          <CalibracionIA
+            ubicacionId={ubicacionId}
+            ajustesJson={ubicacionAjustes}
+            horaApertura={ubicHoraApertura}
+            horaCierre={ubicHoraCierre}
+            empleados={empleados}
+            disponibilidades={disponibilidades}
+          />
+        </TabsContent>
+      )}
+    </Tabs>
 
       {/* Drawer: edición de turno */}
       <Sheet open={!!form} onOpenChange={(o) => !o && setForm(null)}>
