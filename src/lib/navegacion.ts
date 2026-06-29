@@ -33,7 +33,6 @@ const NAV_RESPONSABLE_ADMIN: ItemNav[] = [
   { href: "/cambios", label: "Cambios de turno", icon: Repeat },
   { href: "/fichaje", label: "Fichaje", icon: Clock },
   { href: "/empleados", label: "Empleados", icon: Users },
-  { href: "/nominas", label: "Nóminas y contratos", icon: FileText },
   { href: "/ajustes", label: "Ajustes", icon: Settings },
 ];
 
