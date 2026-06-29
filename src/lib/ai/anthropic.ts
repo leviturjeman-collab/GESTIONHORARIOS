@@ -30,12 +30,12 @@ const env = (k: string) => process.env[k]?.trim();
 
 /** Modelo a usar según la operación (configurable por entorno). */
 export function modeloPara(operacion: string): string | undefined {
-  const base = env("ANTHROPIC_MODEL") || "claude-sonnet-4-6";
+  const base = env("ANTHROPIC_MODEL") || "claude-3-5-sonnet-latest";
   if (operacion === "GENERACION")
-    return env("ANTHROPIC_MODEL_GENERACION") || base || "claude-sonnet-4-6";
+    return env("ANTHROPIC_MODEL_GENERACION") || base || "claude-3-5-sonnet-latest";
   if (operacion === "ASISTENTE") return env("ANTHROPIC_MODEL_ASISTENTE") || base;
   if (operacion === "DETECCION") return env("ANTHROPIC_MODEL_DETECCION") || base;
-  if (operacion === "ANALISIS") return env("ANTHROPIC_MODEL_ANALISIS") || base || "claude-sonnet-4-6";
+  if (operacion === "ANALISIS") return env("ANTHROPIC_MODEL_ANALISIS") || base || "claude-3-5-sonnet-latest";
   return undefined;
 }
 
@@ -84,7 +84,7 @@ export async function generarTexto(
   uso?: UsoCtx
 ): Promise<string | null> {
   if (!cliente) return null;
-  const modelo = modeloPara(uso?.operacion ?? "ASISTENTE") || "claude-sonnet-4-6";
+  const modelo = modeloPara(uso?.operacion ?? "ASISTENTE") || "claude-3-5-sonnet-latest";
   const msg = await cliente.messages.create({
     model: modelo,
     max_tokens: maxTokens,
@@ -184,7 +184,7 @@ export async function generarJSON<T>(opts: {
 }): Promise<T> {
   if (!cliente) throw new Error("IA no configurada (ANTHROPIC_API_KEY vacío).");
 
-  const modelo = opts.modelo || modeloPara(opts.uso?.operacion ?? "ANALISIS") || "claude-sonnet-4-6";
+  const modelo = opts.modelo || modeloPara(opts.uso?.operacion ?? "ANALISIS") || "claude-3-5-sonnet-latest";
   const msg = await cliente.messages.create({
     model: modelo,
     max_tokens: opts.maxTokens ?? 2048,
@@ -220,7 +220,7 @@ export async function generarJSONImagen<T>(opts: {
 }): Promise<T> {
   if (!cliente) throw new Error("IA no configurada (ANTHROPIC_API_KEY vacío).");
 
-  const modelo = opts.modelo || modeloPara(opts.uso?.operacion ?? "ANALISIS") || "claude-sonnet-4-6";
+  const modelo = opts.modelo || modeloPara(opts.uso?.operacion ?? "ANALISIS") || "claude-3-5-sonnet-latest";
   const msg = await cliente.messages.create({
     model: modelo,
     max_tokens: opts.maxTokens ?? 3000,
@@ -244,4 +244,49 @@ export async function generarJSONImagen<T>(opts: {
 
   const bloque = msg.content.find((b) => b.type === "text");
   return parsearJSON(bloque && bloque.type === "text" ? bloque.text : "{}", opts.schema);
+}
+
+/**
+ * Igual que generarJSON pero enviando un DOCUMENTO (PDF nativo para Claude 3.5 Sonnet).
+ */
+export async function generarJSONDocumento<T>(opts: {
+  system: string;
+  prompt: string;
+  documentBase64: string;
+  mediaType: "application/pdf";
+  schema: z.ZodType<T, any, any>;
+  maxTokens?: number;
+  uso?: UsoCtx;
+  modelo?: string;
+}): Promise<T> {
+  if (!cliente) throw new Error("IA no configurada (ANTHROPIC_API_KEY vacío).");
+
+  // Debe ser claude-3-5-sonnet o posterior para soporte PDF nativo
+  const modelo = opts.modelo || modeloPara(opts.uso?.operacion ?? "ANALISIS") || "claude-3-5-sonnet-latest";
+  
+  const msg = await cliente.messages.create({
+    model: modelo,
+    max_tokens: opts.maxTokens ?? 4000,
+    system: opts.system + SUFIJO_JSON,
+    messages: [
+      {
+        role: "user",
+        content: [
+          {
+            type: "document",
+            source: { type: "base64", media_type: opts.mediaType, data: opts.documentBase64 },
+          },
+          { type: "text", text: opts.prompt },
+        ],
+      },
+    ],
+  });
+
+  if (opts.uso)
+    await registrarUso(opts.uso, modelo, msg.usage.input_tokens, msg.usage.output_tokens);
+
+  const bloque = msg.content.find((b) => b.type === "text");
+  const textoRaw = bloque && bloque.type === "text" ? bloque.text : "{}";
+  console.log(`[generarJSONDocumento] modelo=${modelo} tokens_in=${msg.usage.input_tokens} tokens_out=${msg.usage.output_tokens}`);
+  return parsearJSON(textoRaw, opts.schema);
 }

@@ -4,7 +4,7 @@ import { revalidatePath } from "next/cache";
 import * as XLSX from "xlsx";
 import { prisma } from "@/lib/prisma";
 import { requireResponsable, fallo, type Resultado } from "@/lib/guards";
-import { analizarExcel, analizarTextoPlano, type ResultadoAnalisis, type EmpleadoDetectado } from "@/lib/ai/onboarding";
+import { analizarExcel, analizarTextoPlano, analizarPDFDocumento, type ResultadoAnalisis, type EmpleadoDetectado } from "@/lib/ai/onboarding";
 import { IA_ACTIVA } from "@/lib/ai/anthropic";
 import { generarHeuristico, type TurnoPropuesto } from "@/lib/ai/cuadrante";
 import { colorDeRol } from "@/lib/enums";
@@ -94,63 +94,20 @@ export async function analizarArchivo(formData: FormData): Promise<Resultado<Res
       }
     }
 
-    // ── PDF → extraer texto (y OCR como fallback para PDFs escaneados) ──
-    const esPDF = tipo === "application/pdf" || /\.pdf$/i.test(nombreArchivo);
-    if (esPDF) {
+    // ── PDF → Envío directo del documento a Claude 3.5 Sonnet (Nativo) ──
+    if (tipo === "application/pdf" || nombreArchivo.toLowerCase().endsWith(".pdf")) {
+      console.log(`[analizarArchivo] PDF detectado. Enviando a Claude 3.5 Sonnet nativo...`);
       if (!IA_ACTIVA)
         return fallo("El análisis de PDFs necesita la clave de IA (ANTHROPIC_API_KEY).");
       try {
         const buf = Buffer.from(await archivoBlob.arrayBuffer());
-        let textoExtraido = "";
-
-        // Intento 1: OCR con Gemini (excelente para mantener formato de tablas/cuadrantes)
-        try {
-          const pdfBase64 = buf.toString("base64");
-          textoExtraido = await extraerTextoDePDF(pdfBase64, {
-            organizacionId: u.organizacionId,
-            operacion: "OCR",
-          });
-          console.log(`[analizarArchivo] OCR del PDF: ${textoExtraido.length} caracteres`);
-        } catch (ocrErr) {
-          console.warn(
-            "[analizarArchivo] OCR del PDF falló, se intentará texto nativo:",
-            ocrErr instanceof Error ? ocrErr.message : String(ocrErr)
-          );
-        }
-
-        // Intento 2: texto nativo del PDF (pdf-parse v2) como fallback
-        if (textoExtraido.trim().length < 100) {
-          console.log("[analizarArchivo] Probando extraer texto nativo con pdf-parse...");
-          try {
-            const { PDFParse } = await import("pdf-parse");
-            const parser = new PDFParse({ data: new Uint8Array(buf) });
-            try {
-              const res = await parser.getText();
-              textoExtraido = res.text || "";
-            } finally {
-              await parser.destroy();
-            }
-            console.log(`[analizarArchivo] PDF texto nativo: ${textoExtraido.length} caracteres`);
-          } catch (pdfErr) {
-            console.error(
-              "[analizarArchivo] pdf-parse falló:",
-              pdfErr instanceof Error ? pdfErr.message : String(pdfErr)
-            );
-          }
-        }
-
-        if (textoExtraido.trim().length < 30) {
-          return fallo(
-            "No se ha podido leer texto del PDF (ni nativo ni por OCR). " +
-            "Prueba a exportarlo como Excel/CSV, o sube una captura como imagen."
-          );
-        }
-
-        console.log(`[analizarArchivo] Enviando texto del PDF a Claude (${textoExtraido.length} chars)...`);
-        const analisis = await analizarTextoPlano(textoExtraido, {
+        const pdfBase64 = buf.toString("base64");
+        
+        const analisis = await analizarPDFDocumento(pdfBase64, {
           organizacionId: u.organizacionId,
           operacion: "ANALISIS",
         });
+
         if (analisis.empleados.length === 0)
           return fallo(
             "Se ha leído el PDF pero no se han detectado empleados. " +
@@ -158,8 +115,8 @@ export async function analizarArchivo(formData: FormData): Promise<Resultado<Res
           );
         return { ok: true, data: analisis };
       } catch (e) {
-        console.error("[analizarArchivo] Error procesando PDF:", e instanceof Error ? e.message : String(e));
-        return fallo("No se ha podido procesar el PDF. Prueba con imagen o Excel.");
+        console.error("[analizarArchivo] Error procesando PDF nativo:", e instanceof Error ? e.message : String(e));
+        return fallo("No se ha podido procesar el PDF directamente con Claude. Prueba exportándolo a Excel.");
       }
     }
 

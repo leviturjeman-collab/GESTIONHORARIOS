@@ -3,6 +3,7 @@ import {
   IA_ACTIVA,
   generarJSON,
   generarJSONImagen,
+  generarJSONDocumento,
   type UsoCtx,
   type TipoImagen,
 } from "@/lib/ai/anthropic";
@@ -113,6 +114,33 @@ const SINONIMOS: Record<string, string[]> = {
   descanso: ["descanso", "libra", "días libres", "dias descanso", "dia libre"],
   rol: ["rol", "puesto", "categoría", "categoria", "función", "funcion"],
 };
+
+/**
+ * Análisis nativo de PDF (Claude 3.5 Sonnet - multimodal).
+ */
+export async function analizarPDFDocumento(
+  pdfBase64: string,
+  uso?: UsoCtx
+): Promise<ResultadoAnalisis> {
+  const PROMPT_PDF = `
+Eres un analista de RRHH. Te he adjuntado un documento PDF que representa un cuadrante horario o un horario de trabajo semanal/mensual.
+
+${SYSTEM_ANALISIS}
+
+CRÍTICO:
+El documento adjunto es el cuadrante. Extrae TODOS los empleados, sus roles, horas de contrato (si aparecen), descansos, bajas y, sobre todo, TODOS sus turnos (días y horas) que veas en las tablas del PDF. Cruza cada nombre con la columna del día.
+`;
+
+  return await generarJSONDocumento<ResultadoAnalisis>({
+    system: "Eres un experto en lectura de cuadrantes de hostelería.",
+    prompt: PROMPT_PDF,
+    documentBase64: pdfBase64,
+    mediaType: "application/pdf",
+    schema: schemaIA,
+    uso,
+    maxTokens: 4000,
+  });
+}
 
 function normaliza(s: string): string {
   return String(s ?? "")
@@ -247,6 +275,7 @@ function extraerDeResumen(filas: any[][]): EmpleadoDetectado[] {
       });
     }
   }
+
   return [...porClave.values()];
 }
 
