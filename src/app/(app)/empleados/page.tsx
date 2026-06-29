@@ -132,7 +132,7 @@ export default async function EmpleadosPage({
                     <TableCell>
                       <StatusBadge estado={e.estado} />
                     </TableCell>
-                    <TableCell onClick={(ev) => ev.stopPropagation()}>
+                    <TableCell>
                       <EmployeeRowActions empleado={e} ubicaciones={ubicaciones} puedeRgpd={esAdmin(usuario)} />
                     </TableCell>
                   </TableRow>
