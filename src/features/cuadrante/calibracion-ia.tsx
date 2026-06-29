@@ -105,18 +105,7 @@ export function CalibracionIA({
 
   // Parsear ajustes de la ubicación
   const ajustes = ajustesJson ? JSON.parse(ajustesJson) : {};
-  if ((!ajustes.preguntasOnboarding || ajustes.preguntasOnboarding.length === 0) && (!ajustes.respuestasOnboarding || Object.keys(ajustes.respuestasOnboarding).length === 0)) {
-     ajustes.preguntasOnboarding = [
-       {
-         pregunta: "¿Cuál es la máxima prioridad para la Inteligencia Artificial al crear el cuadrante?",
-         opciones: ["Respetar estrictamente los descansos y contratos", "Asegurar que todas las franjas horarias de máxima demanda estén cubiertas", "Minimizar costes evitando horas extra o personal innecesario", "Equilibrio entre descansos justos y buena cobertura"]
-       },
-       {
-         pregunta: "¿Cómo prefieres que la IA asigne los turnos partidos (si se permiten)?",
-         opciones: ["Evitarlos lo máximo posible", "Minimizar el descanso entre turnos (Ej. 2 horas)", "Maximizar el descanso entre turnos (Ej. 3-4 horas)", "Es indiferente"]
-       }
-     ];
-  }
+
 
   const currentHorarioCustom = ajustes.horarioCustom || {
     aperturaSemana: horaApertura || "09:00",
