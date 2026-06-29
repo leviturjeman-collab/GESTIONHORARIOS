@@ -1104,7 +1104,7 @@ export function CalibracionIA({
                     )}
 
                     {/* Panel para curva de demanda */}
-                    {pregLower.includes("cuánta gente hace falta") && (seleccion.includes("curva de demanda") || seleccion.toLowerCase().includes("otro")) && (
+                    {pregLower.includes("cuánta gente hace falta") && seleccion.includes("curva de demanda") && (
                       <div className="mt-2 rounded-lg border border-dashed border-border bg-muted/20 p-3 space-y-3 animate-in fade-in-0 slide-in-from-top-1">
                         <Label className="text-xs font-semibold">Configura las franjas horarias y la demanda de personal:</Label>
                         
@@ -1221,7 +1221,7 @@ export function CalibracionIA({
                       <div className="mt-2 rounded-lg border border-dashed border-border bg-muted/20 p-4 space-y-4 animate-in fade-in-0 slide-in-from-top-1">
                         
                         {/* Adaptación para preguntas sobre empleados */}
-                        {(pregLower.includes("empleado") || pregLower.includes("quién") || pregLower.includes("persona") || pregLower.includes("plantilla") || pregLower.includes("contrato")) && !esAnomalia && (
+                        {(pregLower.includes("quién") || pregLower.includes("disponibilidad limitada") || pregLower.includes("excepción") || seleccion.toLowerCase().includes("por empleado")) && !esAnomalia && (
                           <div className="space-y-2">
                             <Label className="text-xs font-semibold text-primary">Selecciona los empleados implicados:</Label>
                             <div className="flex flex-wrap gap-1.5">
