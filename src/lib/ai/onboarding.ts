@@ -138,7 +138,7 @@ El documento adjunto es el cuadrante. Extrae TODOS los empleados, sus roles, hor
     mediaType: "application/pdf",
     schema: schemaIA,
     uso,
-    maxTokens: 4000,
+    maxTokens: 8192,
   });
 }
 

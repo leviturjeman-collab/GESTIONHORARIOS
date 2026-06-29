@@ -266,7 +266,7 @@ export async function generarJSONDocumento<T>(opts: {
   
   const msg = await cliente.messages.create({
     model: modelo,
-    max_tokens: opts.maxTokens ?? 4000,
+    max_tokens: opts.maxTokens ?? 8192,
     system: opts.system + SUFIJO_JSON,
     messages: [
       {
@@ -287,6 +287,8 @@ export async function generarJSONDocumento<T>(opts: {
 
   const bloque = msg.content.find((b) => b.type === "text");
   const textoRaw = bloque && bloque.type === "text" ? bloque.text : "{}";
-  console.log(`[generarJSONDocumento] modelo=${modelo} tokens_in=${msg.usage.input_tokens} tokens_out=${msg.usage.output_tokens}`);
+  console.log(`[generarJSONDocumento] modelo=${modelo} tokens_in=${msg.usage.input_tokens} tokens_out=${msg.usage.output_tokens} stop=${msg.stop_reason}`);
+  console.log(`[generarJSONDocumento] respuesta (primeros 500 chars):`, textoRaw.slice(0, 500));
+  console.log(`[generarJSONDocumento] respuesta (ultimos 500 chars):`, textoRaw.slice(-500));
   return parsearJSON(textoRaw, opts.schema);
 }
