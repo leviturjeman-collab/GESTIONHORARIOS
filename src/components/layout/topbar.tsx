@@ -1,4 +1,4 @@
-import { Suspense } from "react";
+
 import { esResponsable, esAdmin } from "@/lib/rbac";
 import { LocationSelector } from "@/components/layout/location-selector";
 import { UserMenu } from "@/components/layout/user-menu";
@@ -21,9 +21,7 @@ export function Topbar({
       <MobileNav rol={usuario.rol} />
 
       {esResponsable(usuario) && ubicaciones.length > 0 && (
-        <Suspense>
-          <LocationSelector ubicaciones={ubicaciones} permitirTodas={esAdmin(usuario)} />
-        </Suspense>
+        <LocationSelector ubicaciones={ubicaciones} permitirTodas={esAdmin(usuario)} />
       )}
 
       <div className="flex-1" />

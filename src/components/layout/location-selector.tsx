@@ -35,14 +35,12 @@ export function LocationSelector({
     router.push(`${pathname}?${p.toString()}`);
   }
 
-  const customText = actual === "todas" ? "Todas las ubicaciones" : ubicaciones.find(u => u.id === actual)?.nombre ?? "Ubicación";
-
   return (
     <Select value={actual} onValueChange={seleccionar}>
       <SelectTrigger className="h-9 w-[220px] bg-card hover:bg-muted font-medium shadow-sm border-input">
         <div className="flex items-center gap-2 truncate">
           <Building2 className="size-4 shrink-0 text-muted-foreground" />
-          <span className="truncate">{customText}</span>
+          <SelectValue placeholder="Selecciona ubicación" />
         </div>
       </SelectTrigger>
       <SelectContent align="start">
