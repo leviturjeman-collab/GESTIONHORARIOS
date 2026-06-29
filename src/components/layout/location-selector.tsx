@@ -1,14 +1,7 @@
 "use client";
 
 import { useRouter, usePathname, useSearchParams } from "next/navigation";
-import { Building2 } from "lucide-react";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { Building2, ChevronDown } from "lucide-react";
 
 type Ubic = { id: string; nombre: string };
 
@@ -23,8 +16,6 @@ export function LocationSelector({
   const pathname = usePathname();
   const params = useSearchParams();
 
-  // La ubicación activa vive en la URL (?ubicacion=). Por defecto: "todas"
-  // para quien puede verlas todas, o la primera ubicación accesible.
   const actual =
     params.get("ubicacion") ?? (permitirTodas ? "todas" : ubicaciones[0]?.id ?? "todas");
 
@@ -36,25 +27,21 @@ export function LocationSelector({
   }
 
   return (
-    <Select value={actual} onValueChange={seleccionar}>
-      <SelectTrigger className="h-9 w-[220px] bg-card hover:bg-muted font-medium shadow-sm border-input">
-        <div className="flex items-center gap-2 truncate">
-          <Building2 className="size-4 shrink-0 text-muted-foreground" />
-          <SelectValue placeholder="Selecciona ubicación" />
-        </div>
-      </SelectTrigger>
-      <SelectContent align="start">
-        {permitirTodas && (
-          <SelectItem value="todas">
-            Todas las ubicaciones
-          </SelectItem>
-        )}
+    <div className="relative">
+      <Building2 className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <select
+        value={actual}
+        onChange={(e) => seleccionar(e.target.value)}
+        className="h-9 w-[220px] appearance-none rounded-md border border-input bg-card pl-9 pr-8 text-sm font-medium shadow-sm hover:bg-muted focus:outline-none focus:ring-2 focus:ring-ring cursor-pointer"
+      >
+        {permitirTodas && <option value="todas">Todas las ubicaciones</option>}
         {ubicaciones.map((u) => (
-          <SelectItem key={u.id} value={u.id}>
+          <option key={u.id} value={u.id}>
             {u.nombre}
-          </SelectItem>
+          </option>
         ))}
-      </SelectContent>
-    </Select>
+      </select>
+      <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground opacity-50" />
+    </div>
   );
 }
