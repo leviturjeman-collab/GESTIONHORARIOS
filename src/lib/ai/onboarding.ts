@@ -128,7 +128,8 @@ Eres un analista de RRHH. Te he adjuntado un documento PDF que representa un cua
 ${SYSTEM_ANALISIS}
 
 CRÍTICO:
-El documento adjunto es el cuadrante. Extrae TODOS los empleados, sus roles, horas de contrato (si aparecen), descansos, bajas y, sobre todo, TODOS sus turnos (días y horas) que veas en las tablas del PDF. Cruza cada nombre con la columna del día.
+El documento adjunto es el cuadrante. Extrae TODOS los empleados, sus roles, horas de contrato (si aparecen), descansos, bajas y sus turnos (días y horas) que veas en las tablas del PDF. 
+ATENCIÓN: Si el cuadrante es de varias semanas o de un mes entero, EXTRAE ÚNICAMENTE LOS TURNOS DE LA PRIMERA SEMANA (los primeros 7 días) para cada empleado. Ignora el resto de días para no generar un JSON excesivamente largo. Cruza cada nombre con la columna del día correspondiente.
 `;
 
   return await generarJSONDocumento<ResultadoAnalisis>({
