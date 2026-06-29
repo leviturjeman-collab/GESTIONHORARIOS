@@ -1607,7 +1607,7 @@ export function CalibracionIA({
         <CardContent className="space-y-4">
           <div className="grid gap-4 sm:grid-cols-2">
             <div className="space-y-1.5">
-              <Label>Apertura (Lunes a Viernes)</Label>
+              <Label>{form.diferenteFinSemana ? "Apertura (Lunes a Viernes)" : "Hora de apertura (todos los días)"}</Label>
               <Input
                 type="time"
                 value={form.aperturaSemana}
@@ -1615,7 +1615,7 @@ export function CalibracionIA({
               />
             </div>
             <div className="space-y-1.5">
-              <Label>Cierre (Lunes a Viernes)</Label>
+              <Label>{form.diferenteFinSemana ? "Cierre (Lunes a Viernes)" : "Hora de cierre (todos los días)"}</Label>
               <Input
                 type="time"
                 value={form.cierreSemana}
