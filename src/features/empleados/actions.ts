@@ -1,8 +1,6 @@
 "use server";
 
 import { randomUUID } from "crypto";
-import { rm } from "fs/promises";
-import path from "path";
 import { revalidatePath } from "next/cache";
 import bcrypt from "bcryptjs";
 import { prisma } from "@/lib/prisma";
@@ -10,6 +8,7 @@ import { requireResponsable, requireAdmin, puedeUbicacion, empleadoEnAmbito, fal
 import { empleadoSchema } from "@/lib/validators/empleado";
 import { colorDeRol } from "@/lib/enums";
 import { enviarEmail } from "@/lib/email";
+import { borrarArchivos } from "@/lib/storage";
 
 const APP_URL = process.env.APP_URL || "http://localhost:3000";
 
@@ -271,6 +270,13 @@ export async function borrarDatosEmpleado(empleadoId: string): Promise<Resultado
   });
   if (!emp || emp.organizacionId !== u.organizacionId) return fallo("Empleado no encontrado");
 
+  // Recoge las rutas de los documentos ANTES de borrar (el empleado se elimina en
+  // cascada en la BD; los archivos hay que quitarlos aparte del almacenamiento).
+  const docs = await prisma.documento.findMany({
+    where: { empleadoId },
+    select: { ruta: true },
+  });
+
   await prisma.empleado.delete({ where: { id: empleadoId } });
   if (emp.usuarioId) {
     try {
@@ -279,12 +285,8 @@ export async function borrarDatosEmpleado(empleadoId: string): Promise<Resultado
       /* la cuenta ya no existe */
     }
   }
-  // Elimina los archivos físicos del empleado.
-  try {
-    await rm(path.join(process.cwd(), "uploads", empleadoId), { recursive: true, force: true });
-  } catch {
-    /* sin archivos */
-  }
+  // Elimina los archivos del empleado del almacenamiento (Supabase Storage o local).
+  await borrarArchivos(docs.map((d) => d.ruta));
 
   revalidatePath("/empleados");
   return { ok: true };

@@ -34,16 +34,26 @@ export async function guardarRespuestasCalibracion(
 ): Promise<Resultado> {
   const u = await asegurarAcceso(ubicacionId);
   const org = await prisma.organizacion.findUnique({ where: { id: u.organizacionId } });
-  const ajustes = JSON.parse(org?.ajustes || "{}");
+  const ubic = await prisma.ubicacion.findUnique({ where: { id: ubicacionId } });
+  const ajustesOrg = JSON.parse(org?.ajustes || "{}");
+  const ajustesUbic = JSON.parse(ubic?.ajustes || "{}");
   
-  ajustes.respuestasOnboarding = input.respuestas;
-  // Borramos las preguntas generadas porque ya se han respondido
-  delete ajustes.preguntasOnboarding;
+  ajustesOrg.respuestasOnboarding = input.respuestas;
+  delete ajustesOrg.preguntasOnboarding;
   
-  await prisma.organizacion.update({
-    where: { id: u.organizacionId },
-    data: { ajustes: JSON.stringify(ajustes) },
-  });
+  ajustesUbic.respuestasOnboarding = input.respuestas;
+  delete ajustesUbic.preguntasOnboarding;
+
+  await prisma.$transaction([
+    prisma.organizacion.update({
+      where: { id: u.organizacionId },
+      data: { ajustes: JSON.stringify(ajustesOrg) },
+    }),
+    prisma.ubicacion.update({
+      where: { id: ubicacionId },
+      data: { ajustes: JSON.stringify(ajustesUbic) },
+    })
+  ]);
 
   return { ok: true };
 }

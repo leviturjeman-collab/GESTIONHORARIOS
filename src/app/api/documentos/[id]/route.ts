@@ -1,10 +1,9 @@
 import { NextRequest } from "next/server";
-import { readFile } from "fs/promises";
-import path from "path";
 import { getSesion } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { esAdmin, esManager } from "@/lib/rbac";
 import { puedeUbicacion } from "@/lib/guards";
+import { leerArchivo } from "@/lib/storage";
 
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const u = await getSesion();
@@ -27,7 +26,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
   if (!permitido) return new Response("Prohibido", { status: 403 });
 
   try {
-    const buf = await readFile(path.join(process.cwd(), doc.ruta));
+    const buf = await leerArchivo(doc.ruta);
     const esPdf = doc.nombre.toLowerCase().endsWith(".pdf");
     return new Response(buf, {
       headers: {

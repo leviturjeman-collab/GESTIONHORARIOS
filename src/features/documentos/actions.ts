@@ -1,10 +1,9 @@
 "use server";
 
-import { writeFile, mkdir } from "fs/promises";
-import path from "path";
 import { revalidatePath } from "next/cache";
 import { prisma } from "@/lib/prisma";
 import { requireResponsable, empleadoEnAmbito, fallo, type Resultado } from "@/lib/guards";
+import { guardarArchivo } from "@/lib/storage";
 
 const TIPOS = ["CONTRATO", "NOMINA", "JUSTIFICANTE"];
 
@@ -20,11 +19,9 @@ export async function subirDocumento(formData: FormData): Promise<Resultado> {
   if (!(file instanceof File) || file.size === 0) return fallo("Selecciona un archivo");
   if (file.size > 10 * 1024 * 1024) return fallo("El archivo supera los 10 MB");
 
-  const dir = path.join(process.cwd(), "uploads", empleadoId);
-  await mkdir(dir, { recursive: true });
   const nombreSeguro = `${Date.now()}-${file.name.replace(/[^\w.\-]/g, "_")}`;
-  const ruta = path.join("uploads", empleadoId, nombreSeguro);
-  await writeFile(path.join(process.cwd(), ruta), Buffer.from(await file.arrayBuffer()));
+  const ruta = `${empleadoId}/${nombreSeguro}`;
+  await guardarArchivo(ruta, Buffer.from(await file.arrayBuffer()), file.type || "application/octet-stream");
 
   await prisma.documento.create({
     data: {
