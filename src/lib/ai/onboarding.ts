@@ -127,9 +127,10 @@ Eres un analista de RRHH. Te he adjuntado un documento PDF que representa un cua
 
 ${SYSTEM_ANALISIS}
 
-CRÍTICO:
-El documento adjunto es el cuadrante. Extrae TODOS los empleados, sus roles, horas de contrato (si aparecen), descansos, bajas y sus turnos (días y horas). 
-ATENCIÓN: Si el cuadrante es de varias semanas, EXTRAE ÚNICAMENTE UNA SEMANA REPRESENTATIVA (7 días) DE TURNOS PARA CADA EMPLEADO. Si un empleado está de vacaciones o baja la primera semana, busca sus turnos en la siguiente semana en la que trabaje para obtener su horario habitual. El objetivo es NO saturar la respuesta, extrayendo solo 1 semana normal por persona. Cruza cada nombre con la columna del día correspondiente.
+CRÍTICO PARA NO SUPERAR EL LÍMITE DE TOKENS:
+1. El documento tiene varias páginas (distintas semanas). DEBES DEDUPLICAR a los empleados. Si un empleado aparece en varias páginas, agrúpalo en UNA SOLA entrada. ¡NUNCA crees dos entradas para la misma persona!
+2. NO extraigas el campo "turnos". Déjalo siempre vacío: "turnos": []. Si no hay tabla de horas, calcula mentalmente cuántas horas trabaja en una semana típica y pon el resultado en "horasSemana".
+3. Extrae TODOS los empleados únicos, sus roles (deducidos de la sección), descansos, bajas y horas semanales.
 `;
 
   return await generarJSONDocumento<ResultadoAnalisis>({
