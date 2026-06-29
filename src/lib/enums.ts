@@ -237,9 +237,30 @@ export const COLOR_ROL_FUNCIONAL: Record<string, string> = {
 };
 
 export function colorDeRol(rol: string): string {
-  return COLOR_ROL_FUNCIONAL[rol] ?? "#0ea5e9";
+  if (!rol) return "#94a3b8"; // gris claro por defecto
+  if (COLOR_ROL_FUNCIONAL[rol]) return COLOR_ROL_FUNCIONAL[rol];
+  
+  // Hash string to generate a persistent color
+  let hash = 0;
+  for (let i = 0; i < rol.length; i++) {
+    hash = rol.charCodeAt(i) + ((hash << 5) - hash);
+  }
+  
+  // Pick from a nice palette of Tailwind colors
+  const PALETTE = [
+    "#ef4444", "#f97316", "#f59e0b", "#84cc16", "#22c55e",
+    "#10b981", "#14b8a6", "#06b6d4", "#0ea5e9", "#3b82f6",
+    "#6366f1", "#8b5cf6", "#a855f7", "#d946ef", "#ec4899",
+    "#f43f5e"
+  ];
+  return PALETTE[Math.abs(hash) % PALETTE.length];
 }
 
 export function etiquetaRol(rol: string): string {
-  return ETIQUETA_ROL_FUNCIONAL[rol] ?? rol;
+  if (!rol) return "";
+  if (ETIQUETA_ROL_FUNCIONAL[rol]) return ETIQUETA_ROL_FUNCIONAL[rol];
+  
+  // Formatear rol desconocido: "ayudante_cocina" -> "Ayudante de cocina" (básico)
+  const limpio = rol.replace(/_/g, " ");
+  return limpio.charAt(0).toUpperCase() + limpio.slice(1);
 }

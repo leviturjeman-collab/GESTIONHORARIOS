@@ -93,7 +93,16 @@ export function CalibracionIA({
   const [guardando, setGuardando] = useState(false);
   const [cargandoAccion, setCargandoAccion] = useState<string | null>(null);
 
-  const [respuestas, setRespuestas] = useState<Record<number, string>>({});
+  const [respuestas, setRespuestas] = useState<Record<number, string>>(() => {
+    const parsedAjustes = ajustesJson ? JSON.parse(ajustesJson) : {};
+    const saved = (parsedAjustes.respuestasOnboarding || {}) as Record<string, string>;
+    const init: Record<number, string> = {};
+    for (const [k, v] of Object.entries(saved)) {
+      const idx = Number(k);
+      if (!k.includes("_") && !isNaN(idx) && typeof v === "string") init[idx] = v;
+    }
+    return init;
+  });
   const [subRespuestas, setSubRespuestas] = useState<Record<string, boolean | string>>({});
   const [detallesRestricciones, setDetallesRestricciones] = useState<Record<string, { tipo: "dia" | "turno" | "otro"; dia?: number; turno?: string; notas?: string }>>({});
   const [curvaDemanda, setCurvaDemanda] = useState<{ inicio: string, fin: string, roles: Record<string, number> }[]>([
@@ -384,15 +393,20 @@ export function CalibracionIA({
   return (
     <div className="space-y-6">
       
-      {/* 0. Preguntas de calibración de la IA (mostradas desde el onboarding) */}
+      {/* 0. Preguntas de calibración del sistema (mostradas desde el onboarding) */}
       {Array.isArray(ajustes.preguntasOnboarding) && ajustes.preguntasOnboarding.length > 0 ? (
         <Card className="border-primary/30 bg-primary/5">
           <CardHeader className="pb-3">
             <CardTitle className="flex items-center gap-2 text-primary">
-              <Sparkles className="size-5" /> Por favor, finaliza la configuración de tu local
+              <Sparkles className="size-5" />
+              {Object.keys(ajustes.respuestasOnboarding || {}).length > 0
+                ? "Configuración del Sistema — actualizar respuestas"
+                : "Por favor, finaliza la configuración de tu local"}
             </CardTitle>
             <CardDescription>
-              Responde estas preguntas para que podamos generar tu cuadrante de forma automática y precisa.
+              {Object.keys(ajustes.respuestasOnboarding || {}).length > 0
+                ? "Puedes actualizar tus respuestas en cualquier momento para mejorar la generación del cuadrante."
+                : "Responde estas preguntas para que podamos generar tu cuadrante de forma automática y precisa."}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -403,16 +417,20 @@ export function CalibracionIA({
                 <Sparkles className="size-4 text-accent" /> Necesitamos algunos detalles
                 para planificar mejor
               </p>
-              {(ajustes.preguntasOnboarding).map((q: {pregunta: string, opciones: string[]}, i: number) => {
+              {(ajustes.preguntasOnboarding).map((q: {pregunta: string, opciones: string[], tipoUI?: string}, i: number) => {
                 const seleccion = respuestas[i] ?? "";
                 const pregLower = q.pregunta.toLowerCase();
-                const esRestricciones = pregLower.includes("restriccion") || pregLower.includes("preferencia");
-                const esPartido = pregLower.includes("partido") || pregLower.includes("partida");
+                const tipoUI = q.tipoUI || "texto";
+                
+                const esRestricciones = tipoUI === "selector_empleados" || pregLower.includes("restriccion") || pregLower.includes("preferencia");
+                const esPartido = tipoUI === "selector_roles" || pregLower.includes("partido") || pregLower.includes("partida");
                 const mostrarEmpleados = esRestricciones && seleccion.toLowerCase().includes("algunos");
                 const mostrarRoles = esPartido && seleccion !== "" && !seleccion.toLowerCase().includes("ninguno") && !seleccion.toLowerCase().includes("todos");
 
-                const esHorario = pregLower.includes("apertura") || pregLower.includes("cierre") || pregLower.includes("horario");
-                const esAnomalia = pregLower.includes("tabla resumen") || pregLower.includes("detectado") || pregLower.includes("aparece") || pregLower.includes("documento");
+                const esHorario = tipoUI === "selector_horario" || pregLower.includes("apertura") || pregLower.includes("horario") || (pregLower.includes("cierre") && !pregLower.includes("cierra"));
+                const esDiasCierre = tipoUI === "selector_dias" || (pregLower.includes("cierra") && pregLower.includes("día")) || pregLower.includes("día completo") || pregLower.includes("días de cierre");
+                const mostrarDiasCierre = esDiasCierre && (seleccion.toLowerCase().includes("configurar") || seleccion.toLowerCase().includes("manualmente") || seleccion.toLowerCase().includes("otros"));
+                const esAnomalia = tipoUI === "anomalia" || pregLower.includes("tabla resumen") || pregLower.includes("detectado") || pregLower.includes("aparece") || pregLower.includes("documento");
                 const tieneOtro = q.opciones.some(o => {
                   const opLower = o.toLowerCase();
                   return opLower.includes("otro") || opLower.includes("manualmente") || opLower.includes("especificar");
@@ -486,7 +504,28 @@ export function CalibracionIA({
                                   return next;
                                 });
                               }
-                              
+
+                              if (esDiasCierre) {
+                                const opLower = opcion.toLowerCase();
+                                const DIAS_IDX: Record<string, number> = {
+                                  lunes: 0, martes: 1, miércoles: 2, miercoles: 2,
+                                  jueves: 3, viernes: 4, sábado: 5, sabado: 5, domingo: 6,
+                                };
+                                const diaEntry = Object.entries(DIAS_IDX).find(([dia]) => opLower.includes(dia));
+                                if (diaEntry) {
+                                  const diaIdx = diaEntry[1];
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    diasCierre: isSelected
+                                      ? prev.diasCierre.includes(diaIdx) ? prev.diasCierre : [...prev.diasCierre, diaIdx]
+                                      : prev.diasCierre.filter((d) => d !== diaIdx),
+                                  }));
+                                }
+                                if (opLower.includes("no, abrimos") || opLower.includes("lunes a domingo") || opLower.includes("todos los días")) {
+                                  setForm((prev) => ({ ...prev, diasCierre: [] }));
+                                }
+                              }
+
                               return newRes;
                             });
                           }}
@@ -828,6 +867,42 @@ export function CalibracionIA({
                                 )}
                               >
                                 {etiquetaRol(rol)}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Sub-selección: días de cierre */}
+                    {mostrarDiasCierre && (
+                      <div className="mt-2 rounded-lg border border-dashed border-border bg-muted/20 p-3 space-y-2 animate-in fade-in-0 slide-in-from-top-1">
+                        <p className="text-xs font-medium text-muted-foreground">
+                          Selecciona los días que el local está cerrado:
+                        </p>
+                        <div className="flex flex-wrap gap-1.5">
+                          {["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"].map((dayName, dayIdx) => {
+                            const isClosed = form.diasCierre.includes(dayIdx);
+                            return (
+                              <button
+                                key={dayName}
+                                type="button"
+                                onClick={() =>
+                                  setForm((prev) => ({
+                                    ...prev,
+                                    diasCierre: isClosed
+                                      ? prev.diasCierre.filter((d) => d !== dayIdx)
+                                      : [...prev.diasCierre, dayIdx],
+                                  }))
+                                }
+                                className={cn(
+                                  "px-3 py-1 rounded text-xs font-medium border transition-all",
+                                  isClosed
+                                    ? "border-destructive bg-destructive/10 text-destructive shadow-sm"
+                                    : "border-border bg-background text-muted-foreground hover:bg-muted"
+                                )}
+                              >
+                                {dayName} {isClosed && "(Cerrado)"}
                               </button>
                             );
                           })}
@@ -1567,7 +1642,9 @@ export function CalibracionIA({
           <div className="flex justify-end mt-4">
     <Button onClick={guardarRespuestasNuevas} disabled={guardando}>
       {guardando ? <Loader2 className="mr-2 size-4 animate-spin" /> : <Save className="mr-2 size-4" />}
-      Guardar Configuración Inicial
+      {Object.keys(ajustes.respuestasOnboarding || {}).length > 0
+        ? "Actualizar Configuración"
+        : "Guardar Configuración Inicial"}
     </Button>
   </div>
         </div>

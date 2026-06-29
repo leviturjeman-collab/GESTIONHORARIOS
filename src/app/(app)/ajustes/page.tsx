@@ -174,7 +174,7 @@ export default async function AjustesPage({
           <Card>
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Sparkles className="size-4 text-accent" /> Inteligencia artificial
+                <Sparkles className="size-4 text-accent" /> Configuración inteligente
               </CardTitle>
               <CardDescription>Clave de Anthropic (ANTHROPIC_API_KEY).</CardDescription>
             </CardHeader>

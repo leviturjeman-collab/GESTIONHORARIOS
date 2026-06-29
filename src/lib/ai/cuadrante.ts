@@ -56,20 +56,36 @@ function suma(h: string, horas: number): string {
 }
 
 /** Generación heurística (modo simulado, sin coste de API): reparte las horas de contrato. */
-export function generarHeuristico(ctx: ContextoGeneracion): { turnos: TurnoPropuesto[]; resumen: string } {
+export function generarHeuristico(
+  ctx: ContextoGeneracion,
+  params?: { maxHorasDia?: number; minHorasTurno?: number; diasFuertes?: number[] }
+): { turnos: TurnoPropuesto[]; resumen: string } {
+  const maxHoras = params?.maxHorasDia ?? 9;
+  const minHoras = params?.minHorasTurno ?? 3;
+  const diasFuertes = params?.diasFuertes ?? [];
+
   const turnos: TurnoPropuesto[] = [];
   for (const e of ctx.empleados) {
     const disponibles = [0, 1, 2, 3, 4, 5, 6].filter((d) => !e.diasNoDisponibles.includes(d));
-    const diasTrabajo = Math.min(disponibles.length, esParcial(e.tipo) ? 4 : 5);
-    const dias = disponibles.slice(0, diasTrabajo);
+    const numDescanso = e.diasDescanso ?? 2;
+    const diasTrabajo = Math.max(1, disponibles.length - numDescanso);
+
+    // Priorizar días fuertes; el resto en orden natural
+    const sorted = [...disponibles].sort((a, b) => {
+      const aF = diasFuertes.includes(a) ? 0 : 1;
+      const bF = diasFuertes.includes(b) ? 0 : 1;
+      return aF - bF || a - b;
+    });
+    const dias = sorted.slice(0, diasTrabajo);
     if (dias.length === 0) continue;
-    const horasDia = Math.max(3, Math.min(9, e.horasContrato / Math.max(1, dias.length)));
+
+    const horasDia = Math.min(maxHoras, Math.max(minHoras, e.horasContrato / Math.max(1, dias.length)));
     for (const d of dias) {
       const reglaRol = ctx.reglas?.find((r) => r.rol === e.rol);
       const horaInicio = reglaRol
         ? reglaRol.franjaInicio
         : e.rol === "limpieza" || e.rol === "office"
-        ? "04:00"
+        ? "06:00"
         : ctx.horaApertura;
 
       turnos.push({
@@ -83,7 +99,7 @@ export function generarHeuristico(ctx: ContextoGeneracion): { turnos: TurnoPropu
   }
   return {
     turnos,
-    resumen: `Generación automática: ${turnos.length} turnos repartiendo las horas de contrato en los días disponibles (respetando horarios de limpieza/office y reglas de cobertura).`,
+    resumen: `Generación automática: ${turnos.length} turnos repartiendo las horas de contrato en los días disponibles.`,
   };
 }
 
@@ -100,16 +116,37 @@ export async function generarTurnosIA(
       maxTokens: 4000,
       uso,
       system:
-        "Eres un planificador de turnos de hostelería. Genera un cuadrante semanal (lunes=0 … domingo=6).\n" +
-        "Reglas fundamentales a respetar obligatoriamente:\n" +
-        "1. Horas de contrato: Intenta ajustarte a las horas semanales de contrato de cada empleado. Si las necesidades de cobertura mínima del local lo requieren, se les puede asignar algunas horas extras (superando las horas de su contrato).\n" +
-        "2. Días de descanso: Cada empleado debe tener al menos el número de días de descanso especificados en 'diasDescanso' (generalmente 2 días de descanso a la semana, marcados sin turnos).\n" +
-        "3. Días no disponibles: No asignes turnos en los días indicados en 'diasNoDisponibles'.\n" +
-        "4. Restricciones horarias: Respeta estrictamente la lista de 'restricciones' de cada empleado (por ejemplo, si no puede trabajar en ciertas franjas horarias o días, o notas específicas).\n" +
-        "5. REGLA ESTRICTA DE PREPARACIÓN Y LIMPIEZA: Los empleados con rol 'limpieza', 'office' (o ayudantes de preparación) DEBEN entrar a trabajar ANTES de la hora de apertura del local (por ejemplo, 1 o 2 horas antes, o a las 06:00 am si es necesario preparar). Por el contrario, los cocineros, camareros y personal de servicio NUNCA deben empezar su turno antes de la hora de apertura (empiezan justo a la hora de apertura o más tarde).\n" +
-        "6. Cobertura mínima: Asegura la cobertura mínima por rol y franja horaria definida en las reglas.\n" +
-        "Cada turno debe contener: empleadoId, diaIdx, rol, horaInicio, horaFin ('HH:mm'). Marca partido=true con horaInicio2/horaFin2 si procede.\n" +
-        "Devuelve también un 'resumen' breve en español de lo que has hecho.",
+        "Eres un planificador de turnos experto. Genera un cuadrante semanal (lunes=0 … domingo=6).\n\n" +
+
+        "═══════════════════════════════════════════════\n" +
+        "BLOQUE 1 — REGLAS ABSOLUTAS (NUNCA romper)\n" +
+        "═══════════════════════════════════════════════\n" +
+        "1. diasNoDisponibles: PROHIBIDO asignar cualquier turno en días indicados como no disponibles.\n" +
+        "2. Ausencias aprobadas: PROHIBIDO asignar turnos en fechas con ausencia.\n" +
+        "3. permitePartido=false: ese empleado SOLO puede tener turnos continuos (partido=false siempre).\n" +
+        "4. admiteHorasExtra=false: ese empleado NO puede superar sus horasContrato en ningún caso.\n" +
+        "5. Horario del local: NINGÚN turno puede empezar antes de horaApertura ni terminar después de horaCierre, EXCEPTO limpieza/office que deben entrar 1-2 horas ANTES de apertura.\n" +
+        "6. Restricciones individuales: respeta la lista 'restricciones' de cada empleado al pie de la letra.\n\n" +
+
+        "═══════════════════════════════════════════════\n" +
+        "BLOQUE 2 — REGLAS IMPORTANTES (romper solo si la cobertura mínima lo exige)\n" +
+        "═══════════════════════════════════════════════\n" +
+        "1. Horas de contrato: ajústate a horasContrato por semana (±15% máx si la cobertura lo requiere).\n" +
+        "2. Días de descanso: cada empleado debe tener al menos diasDescanso días SIN turno.\n" +
+        "3. Descanso entre jornadas: mínimo 12h entre el fin de un turno y el inicio del siguiente.\n" +
+        "4. Días consecutivos: no más de 6 días seguidos sin descanso.\n" +
+        "5. Cobertura mínima: cumple las reglas de minPersonas por rol y franja horaria.\n\n" +
+
+        "═══════════════════════════════════════════════\n" +
+        "BLOQUE 3 — PREFERENCIAS (aplicar si es posible, sin garantía)\n" +
+        "═══════════════════════════════════════════════\n" +
+        "1. preferenciaTurno del empleado (MAÑANA/TARDE): asignar en esa franja si los recursos lo permiten.\n" +
+        "2. Equidad: repartir turnos de fin de semana y cierres de forma equilibrada entre la plantilla.\n" +
+        "3. Descansos consecutivos: si es posible, los días libres deben ser seguidos.\n" +
+        "4. Refuerzo en días fuertes: si hay días de mayor demanda indicados, priorizar cobertura allí.\n\n" +
+
+        "Formato de salida: cada turno debe tener empleadoId, diaIdx, rol, horaInicio, horaFin ('HH:mm').\n" +
+        "Si partido=true, incluye horaInicio2/horaFin2. Devuelve también un 'resumen' breve en español.",
       prompt:
         `Instrucción del responsable: "${instruccion || "Genera la semana de forma equilibrada."}"\n\n` +
         `Contexto:\n${JSON.stringify(ctx)}`,

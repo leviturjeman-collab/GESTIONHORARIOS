@@ -372,6 +372,8 @@ export function PlanningBoard({
   async function generarAuto() {
     setConfirmAiOpen(false);
 
+    let problemasDetectados: any[] = [];
+
     const p = (async () => {
       const res = await generarPreviewIA(
         ubicacionId,
@@ -381,17 +383,23 @@ export function PlanningBoard({
       if (!res.ok) throw new Error(res.error || "Error al generar la propuesta");
       if (!res.data) throw new Error("Error al generar la propuesta");
 
+      problemasDetectados = res.data.problemas ?? [];
+
       const appRes = await aplicarPreviewIA(ubicacionId, semanaISO, res.data.turnos as any);
       if (!appRes.ok) throw new Error(appRes.error || "Error al aplicar el cuadrante");
-      
-      return true;
+
+      return problemasDetectados;
     })();
 
     toast.promise(p, {
       loading: "Analizando reglas y generando cuadrante con IA...",
-      success: () => {
+      success: (problemas) => {
         router.refresh();
-        return "Cuadrante generado automáticamente";
+        setProblemas(problemas ?? []);
+        const n = (problemas ?? []).length;
+        return n > 0
+          ? `Cuadrante generado — ${n} aviso${n !== 1 ? "s" : ""} detectado${n !== 1 ? "s" : ""}`
+          : "Cuadrante generado sin incidencias";
       },
       error: (err) => err.message
     });
@@ -738,7 +746,7 @@ export function PlanningBoard({
               <DialogTitle>Generar cuadrante</DialogTitle>
             </div>
             <DialogDescription>
-              El sistema utilizará la Inteligencia Artificial para crear el mejor horario posible.
+              El sistema inteligente calculará el mejor horario posible.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 py-2">

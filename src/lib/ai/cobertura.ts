@@ -225,7 +225,7 @@ const DIAS = [
  * Genera preguntas contextuales basadas en los datos REALES del cuadrante.
  * No son preguntas genéricas: mencionan números concretos y patrones detectados.
  */
-function generarPreguntasInteligentes(
+export function generarPreguntasInteligentes(
   roles: ResumenRol[],
   ctx: { horaApertura: string; horaCierre: string; diasPico: number[] }
 ): PreguntaIA[] {
@@ -238,9 +238,9 @@ function generarPreguntasInteligentes(
       `Para que no se asignen turnos fuera de hora, ¿es este el horario de actividad real del local (desde que entra el primero hasta que sale el último)?`,
     opciones: [
       `Sí, de ${ctx.horaApertura} a ${ctx.horaCierre} todos los días`,
-      "El horario cambia según el día (ej. fines de semana cerramos más tarde)",
       "Es diferente (configurar manualmente)",
     ],
+    tipoUI: "selector_horario",
   });
 
   // ── 2. Día de cierre semanal ──
@@ -259,6 +259,7 @@ function generarPreguntasInteligentes(
         "No, ese día abrimos pero faltaba en el documento",
         "Los días de cierre son otros",
       ],
+      tipoUI: "selector_dias",
     });
   } else {
     preguntas.push({
@@ -269,6 +270,7 @@ function generarPreguntasInteligentes(
         "Domingo",
         "Configurar días de cierre manualmente",
       ],
+      tipoUI: "selector_dias",
     });
   }
 
@@ -282,6 +284,7 @@ function generarPreguntasInteligentes(
       "Mezcla de turnos continuos y partidos según necesidad",
       "Configurar manualmente",
     ],
+    tipoUI: "selector_roles",
   });
 
   // ── 3.5 Preparación y Limpieza ──
@@ -294,6 +297,7 @@ function generarPreguntasInteligentes(
       "Limpieza y office entran a la misma hora de apertura",
       "Configurar manualmente",
     ],
+    tipoUI: "selector_roles",
   });
 
   // ── 4. Matriz de Cobertura / Curva de Demanda ──
@@ -305,6 +309,7 @@ function generarPreguntasInteligentes(
       "Usar el patrón de mi cuadrante actual (el sistema imitará lo que ya hago)",
       "Tengo el mismo volumen de trabajo todo el día (cobertura plana)",
     ],
+    tipoUI: "curva_demanda",
   });
 
   // ── 5. Días punta (Refuerzo de plantilla) ──
@@ -319,6 +324,7 @@ function generarPreguntasInteligentes(
         "No, la demanda es igual todos los días",
         "Configurar los días fuertes manualmente",
       ],
+      tipoUI: "texto",
     });
   }
 
@@ -332,6 +338,7 @@ function generarPreguntasInteligentes(
       "2 días libres pero pueden ser separados si es necesario",
       "Configurar manualmente por empleado",
     ],
+    tipoUI: "texto",
   });
 
   // ── 7. Fatiga: Máximo de días consecutivos ──
@@ -343,6 +350,7 @@ function generarPreguntasInteligentes(
       "6 días seguidos (máximo legal en España)",
       "4 días seguidos",
     ],
+    tipoUI: "texto",
   });
 
   // ── 8. Descanso diario entre turnos ──
@@ -354,6 +362,7 @@ function generarPreguntasInteligentes(
       "10 horas (hostelería flexible / convenio específico)",
       "8 horas (solo casos excepcionales)",
     ],
+    tipoUI: "texto",
   });
 
   // ── 9. Flexibilidad de roles (Polivalencia) ──
@@ -368,6 +377,7 @@ function generarPreguntasInteligentes(
         "Sí, algunos son polivalentes (configuraré quiénes después)",
         "Sí, todos pueden cubrir cualquier rol",
       ],
+      tipoUI: "selector_roles",
     });
   }
 
@@ -381,6 +391,7 @@ function generarPreguntasInteligentes(
       "Se turnan informalmente sin afectar la planificación oficial",
       "Configurar manualmente por empleado",
     ],
+    tipoUI: "texto",
   });
 
   // ── 11. Restricciones de horario (Turnos fijos) ──
@@ -392,6 +403,7 @@ function generarPreguntasInteligentes(
       "Sí, algunos empleados tienen horarios restringidos",
       "La mayoría tienen un turno fijo asignado",
     ],
+    tipoUI: "selector_empleados",
   });
 
   // ── 12. Equidad en turnos difíciles (Rotación justa) ──
@@ -403,6 +415,7 @@ function generarPreguntasInteligentes(
       "No, hay empleados contratados específicamente para esos turnos",
       "Configurar manualmente las preferencias de rotación",
     ],
+    tipoUI: "texto",
   });
 
   // ── 13. Duración MÍNIMA de un turno ──
@@ -415,6 +428,7 @@ function generarPreguntasInteligentes(
       "2 horas mínimo (ej. refuerzos puntuales)",
       "Sin límite mínimo",
     ],
+    tipoUI: "texto",
   });
 
   // ── 14. Límite MÁXIMO de horas diarias ──
@@ -426,6 +440,7 @@ function generarPreguntasInteligentes(
       "9 horas máximo (distribución irregular)",
       "Hasta 12 horas (con turnos partidos y descansos largos)",
     ],
+    tipoUI: "texto",
   });
 
   // ── 15. Seniority / Responsabilidad ──
@@ -437,6 +452,7 @@ function generarPreguntasInteligentes(
       "Es preferible pero no obligatorio",
       "No hace falta controlar la experiencia por turno",
     ],
+    tipoUI: "selector_roles",
   });
 
   return preguntas;

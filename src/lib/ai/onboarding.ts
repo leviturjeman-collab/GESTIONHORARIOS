@@ -8,7 +8,7 @@ import {
 } from "@/lib/ai/anthropic";
 import { ROLES_FUNCIONALES } from "@/lib/enums";
 import { postProcesarResultado } from "@/lib/ai/normalize";
-import { calcularCobertura, type AnalisisCobertura } from "@/lib/ai/cobertura";
+import { calcularCobertura, generarPreguntasInteligentes, type AnalisisCobertura, type ResumenRol } from "@/lib/ai/cobertura";
 import { SYSTEM_ANALISIS_V5 as SYSTEM_ANALISIS, EXCEL_CONTEXT } from "@/lib/ai/prompts";
 
 export type Confianza = "alta" | "media";
@@ -37,6 +37,7 @@ export type EmpleadoDetectado = {
 export type PreguntaIA = {
   pregunta: string;
   opciones: string[];
+  tipoUI?: "selector_empleados" | "selector_roles" | "curva_demanda" | "texto" | "selector_horario" | "selector_dias" | "anomalia";
 };
 
 export type ResultadoAnalisis = {
@@ -95,9 +96,10 @@ const schemaIA = z.object({
         z.object({
           pregunta: z.string(),
           opciones: z.array(z.string()).default([]),
+          tipoUI: z.enum(["selector_empleados", "selector_roles", "curva_demanda", "texto", "selector_horario", "selector_dias", "anomalia"]).optional(),
         }),
         // Compatibilidad: si Claude devuelve strings planos, los transformamos
-        z.string().transform((s) => ({ pregunta: s, opciones: [] })),
+        z.string().transform((s) => ({ pregunta: s, opciones: [], tipoUI: "texto" as const })),
       ])
     )
     .default([]),
@@ -457,7 +459,53 @@ function procesarYEnriquecer(res: ResultadoAnalisis): ResultadoAnalisis {
     };
   }
 
-  return normalizado;
+  // Sin turnos importados: generar igualmente el conjunto completo de preguntas
+  // usando stubs mínimos de rol para que generarPreguntasInteligentes funcione.
+  const rolesUnicos = [...new Set(normalizado.empleados.map((e) => e.rol || "sin_rol"))];
+  const rolesMinimos: ResumenRol[] = rolesUnicos.map((rol) => {
+    const empsRol = normalizado.empleados.filter((e) => e.rol === rol);
+    return {
+      rol,
+      totalEmpleados: empsRol.length,
+      horasContratoPromedio: Math.round(empsRol.reduce((s, e) => s + e.horasSemana, 0) / Math.max(1, empsRol.length)),
+      cobertura: { matriz: Array.from({ length: 7 }, () => Array(24).fill(0)) },
+      franjaMaxima: { inicio: "12:00", fin: "16:00", personas: 1 },
+      franjaMinima: null,
+      picosPorDia: Array(7).fill(0),
+    };
+  });
+
+  const preguntasInteligentes = generarPreguntasInteligentes(rolesMinimos, {
+    horaApertura: "09:00",
+    horaCierre: "23:00",
+    diasPico: [],
+  });
+
+  // Deduplicar: las inteligentes tienen prioridad; filtrar las de Claude que solapen.
+  const temasInteligentes = new Set(
+    preguntasInteligentes.map((p) => {
+      const pl = p.pregunta.toLowerCase();
+      if (pl.includes("apertura") || pl.includes("horario")) return "horario";
+      if (pl.includes("cierra") || pl.includes("día completo")) return "cierre";
+      if (pl.includes("partido")) return "partido";
+      if (pl.includes("descanso entre")) return "descanso_entre";
+      if (pl.includes("días libres") || pl.includes("días seguidos")) return "descanso";
+      return pl.slice(0, 30);
+    })
+  );
+
+  const preguntasClaudeFiltradas = normalizado.preguntas.filter((p) => {
+    const pl = p.pregunta.toLowerCase();
+    if (temasInteligentes.has("horario") && (pl.includes("apertura") || pl.includes("horario"))) return false;
+    if (temasInteligentes.has("partido") && pl.includes("partido")) return false;
+    if (temasInteligentes.has("cierre") && pl.includes("cierra")) return false;
+    return true;
+  });
+
+  return {
+    ...normalizado,
+    preguntas: [...preguntasInteligentes, ...preguntasClaudeFiltradas],
+  };
 }
 
 /** Analiza las filas del Excel. Usa Claude si hay clave; si no, heurística. */

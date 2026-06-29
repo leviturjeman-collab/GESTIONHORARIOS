@@ -28,21 +28,47 @@ export async function guardarRespuestasCalibracion(
   ubicacionId: string,
   input: {
     respuestas: Record<string, string>;
-    curvaDemanda: any;
+    curvaDemanda: { inicio: string; fin: string; roles: Record<string, number> }[];
     subRespuestas: any;
   }
 ): Promise<Resultado> {
   const u = await asegurarAcceso(ubicacionId);
-  const org = await prisma.organizacion.findUnique({ where: { id: u.organizacionId } });
-  const ubic = await prisma.ubicacion.findUnique({ where: { id: ubicacionId } });
+  const [org, ubic] = await Promise.all([
+    prisma.organizacion.findUnique({ where: { id: u.organizacionId } }),
+    prisma.ubicacion.findUnique({ where: { id: ubicacionId } }),
+  ]);
   const ajustesOrg = JSON.parse(org?.ajustes || "{}");
   const ajustesUbic = JSON.parse(ubic?.ajustes || "{}");
-  
+
+  // Guardar respuestas SIN borrar preguntasOnboarding — el card debe permanecer
+  // editable para que el gerente pueda actualizar sus preferencias en cualquier momento.
   ajustesOrg.respuestasOnboarding = input.respuestas;
-  delete ajustesOrg.preguntasOnboarding;
-  
   ajustesUbic.respuestasOnboarding = input.respuestas;
-  delete ajustesUbic.preguntasOnboarding;
+
+  // Convertir curvaDemanda → registros CoberturaMinima (Bug #2).
+  // La generación IA lee coberturaMinima directamente; aquí cerramos el ciclo.
+  const nuevasReglas: {
+    ubicacionId: string; rol: string; diaSemana: null;
+    franjaInicio: string; franjaFin: string; minPersonas: number;
+  }[] = [];
+
+  if (Array.isArray(input.curvaDemanda)) {
+    for (const franja of input.curvaDemanda) {
+      if (!franja.inicio || !franja.fin || !franja.roles) continue;
+      for (const [rol, min] of Object.entries(franja.roles)) {
+        if (typeof min === "number" && min > 0) {
+          nuevasReglas.push({
+            ubicacionId,
+            rol,
+            diaSemana: null,
+            franjaInicio: franja.inicio,
+            franjaFin: franja.fin,
+            minPersonas: min,
+          });
+        }
+      }
+    }
+  }
 
   await prisma.$transaction([
     prisma.organizacion.update({
@@ -52,7 +78,12 @@ export async function guardarRespuestasCalibracion(
     prisma.ubicacion.update({
       where: { id: ubicacionId },
       data: { ajustes: JSON.stringify(ajustesUbic) },
-    })
+    }),
+    // Reemplazar reglas de cobertura con las de la nueva curva de demanda.
+    prisma.coberturaMinima.deleteMany({ where: { ubicacionId } }),
+    ...(nuevasReglas.length > 0
+      ? [prisma.coberturaMinima.createMany({ data: nuevasReglas })]
+      : []),
   ]);
 
   return { ok: true };
@@ -199,7 +230,7 @@ export async function generarPreviewIA(
   ubicacionId: string,
   semanaISO: string,
   instruccion: string
-): Promise<Resultado<{ turnos: TurnoPropuesto[]; resumen: string; modo: string }>> {
+): Promise<Resultado<{ turnos: TurnoPropuesto[]; resumen: string; modo: string; problemas: any[] }>> {
   const u = await asegurarAcceso(ubicacionId);
   const lunes = lunesDeSemana(parseISO(semanaISO));
   const dias = diasDeSemana(lunes);
@@ -337,35 +368,117 @@ export async function generarPreviewIA(
   }
 
   const respuestasOnboarding = ubicAjustes.respuestasOnboarding || orgAjustes.respuestasOnboarding || {};
+
+  // Parsear respuestas conocidas a parámetros estructurados antes de inyectarlas
+  // como texto — así Claude recibe reglas concretas, no frases ambiguas.
+  const params = {
+    maxHorasDia: 9,
+    minHorasEntreJornadas: 12,
+    maxDiasConsecutivos: 6,
+    minHorasTurno: 4,
+    descansoConsecutivo: true,
+    diasFuertes: [] as number[],
+    equidadTurnos: false,
+    requiereSenior: false,
+  };
+
+  Object.values(respuestasOnboarding).forEach((val) => {
+    if (typeof val !== "string") return;
+    const v = val.toLowerCase();
+    if (v.includes("12 horas") && v.includes("legal")) params.minHorasEntreJornadas = 12;
+    else if (v.includes("10 horas")) params.minHorasEntreJornadas = 10;
+    else if (v.includes("8 horas") && v.includes("descanso")) params.minHorasEntreJornadas = 8;
+    if (v.includes("8 horas") && v.includes("máximo")) params.maxHorasDia = 8;
+    else if (v.includes("9 horas") && v.includes("máximo")) params.maxHorasDia = 9;
+    else if (v.includes("12 horas") && v.includes("turno")) params.maxHorasDia = 12;
+    if (v.includes("5 días seguidos")) params.maxDiasConsecutivos = 5;
+    else if (v.includes("4 días seguidos")) params.maxDiasConsecutivos = 4;
+    if (v.includes("4 horas mínimo")) params.minHorasTurno = 4;
+    else if (v.includes("3 horas mínimo")) params.minHorasTurno = 3;
+    else if (v.includes("2 horas mínimo")) params.minHorasTurno = 2;
+    if (v.includes("pueden ser separados")) params.descansoConsecutivo = false;
+    if (v.includes("viernes y sábado")) params.diasFuertes = [4, 5];
+    else if (v.includes("fines de semana") && !v.includes("diferente")) params.diasFuertes = [5, 6];
+    else if (v.includes("entre semana")) params.diasFuertes = [0, 1, 2, 3, 4];
+    if (v.includes("rotación") && v.includes("justa")) params.equidadTurnos = true;
+    if (v.includes("obligatorio al menos 1")) params.requiereSenior = true;
+  });
+
+  const nombresDiasEs = ["lunes", "martes", "miércoles", "jueves", "viernes", "sábado", "domingo"];
+
+  instruccionFinal += "\n### PARÁMETROS CONFIGURADOS POR EL GERENTE (aplicar con prioridad):\n";
+  instruccionFinal += `- Máximo horas por día por empleado: ${params.maxHorasDia}h\n`;
+  instruccionFinal += `- Mínimo horas de descanso entre jornadas: ${params.minHorasEntreJornadas}h\n`;
+  instruccionFinal += `- Máximo días consecutivos sin descanso: ${params.maxDiasConsecutivos}\n`;
+  instruccionFinal += `- Mínimo horas por turno suelto: ${params.minHorasTurno}h\n`;
+  if (params.descansoConsecutivo) instruccionFinal += `- Los días de descanso deben ser CONSECUTIVOS siempre que sea posible\n`;
+  if (params.diasFuertes.length > 0) {
+    instruccionFinal += `- Días de mayor demanda (reforzar plantilla): ${params.diasFuertes.map((d) => nombresDiasEs[d]).join(", ")}\n`;
+  }
+  if (params.equidadTurnos) instruccionFinal += `- Repartir turnos de fin de semana y cierres de forma equitativa\n`;
+  if (params.requiereSenior) instruccionFinal += `- Debe haber al menos un empleado senior/encargado en cada franja horaria\n`;
+
   if (Object.keys(respuestasOnboarding).length > 0) {
-    instruccionFinal += "\nREGLAS ADICIONALES DEL LOCAL Y REQUISITOS DEL GERENTE:\n";
+    instruccionFinal += "\n### NOTAS ADICIONALES DEL GERENTE:\n";
     Object.entries(respuestasOnboarding).forEach(([key, val]) => {
-      if (typeof val === "string" && val.trim() !== "") {
-         if (key.endsWith("_manual_txt")) {
-           instruccionFinal += `- NOTA DEL GERENTE: ${val}\n`;
-         } else if (key.includes("_empdetail_")) {
-           const empNameRaw = key.split("_empdetail_")[1];
-           const empName = empNameRaw.replace("_btn", "").replace("_txt", "");
-           instruccionFinal += `- REGLA PARA EMPLEADO (${empName}): ${val}\n`;
-         } else if (key.includes("_roldetail_")) {
-           const rolNameRaw = key.split("_roldetail_")[1];
-           const rolName = rolNameRaw.replace("_btn", "").replace("_txt", "");
-           instruccionFinal += `- REGLA PARA ROL (${rolName}): ${val}\n`;
-         } else if (!key.includes("_") && val !== "Otro (especificar)") {
-           instruccionFinal += `- PREFERENCIA: ${val}\n`;
-         }
+      if (typeof val === "string" && val.trim() !== "" && val !== "Otro (especificar)") {
+        if (key.endsWith("_manual_txt")) {
+          instruccionFinal += `- NOTA: ${val}\n`;
+        } else if (key.includes("_empdetail_")) {
+          const empName = key.split("_empdetail_")[1].replace(/_btn|_txt/g, "");
+          instruccionFinal += `- REGLA EMPLEADO (${empName}): ${val}\n`;
+        } else if (key.includes("_roldetail_")) {
+          const rolName = key.split("_roldetail_")[1].replace(/_btn|_txt/g, "");
+          instruccionFinal += `- REGLA ROL (${rolName}): ${val}\n`;
+        }
       }
     });
   }
 
-  instruccionFinal += `\nInstrucción del responsable: "${instruccion || "Genera la semana de forma equilibrada."}"`;
+  instruccionFinal += `\n### INSTRUCCIÓN DEL RESPONSABLE:\n"${instruccion || "Genera la semana de forma equilibrada."}"`;
 
   const res = await generarTurnosIA(ctx, instruccionFinal, {
     organizacionId: u.organizacionId,
     ubicacionId,
     operacion: "GENERACION",
   });
-  return { ok: true, data: res };
+
+  // Auto-validar la propuesta generada antes de devolverla al cliente.
+  const problemasDetectados = detectarProblemas({
+    turnos: res.turnos
+      .filter((t) => t.diaIdx >= 0 && t.diaIdx <= 6)
+      .map((t, i) => ({
+        id: String(i),
+        empleadoId: t.empleadoId,
+        dia: dias[t.diaIdx],
+        horaInicio: t.horaInicio,
+        horaFin: t.horaFin,
+        horaInicio2: t.horaInicio2 ?? null,
+        horaFin2: t.horaFin2 ?? null,
+        rol: t.rol,
+      })),
+    empleados: empleados.map((e) => ({
+      id: e.id,
+      nombre: e.nombre,
+      apellidos: e.apellidos,
+      horasContrato: e.contrato?.horasSemana ?? 40,
+    })),
+    reglas: reglas.map((r) => ({
+      rol: r.rol,
+      diaSemana: r.diaSemana,
+      franjaInicio: r.franjaInicio,
+      franjaFin: r.franjaFin,
+      minPersonas: r.minPersonas,
+    })),
+    dias,
+    ausencias: ausencias.map((a) => ({
+      empleadoId: a.empleadoId,
+      fechaInicio: a.fechaInicio,
+      fechaFin: a.fechaFin,
+    })),
+  });
+
+  return { ok: true, data: { ...res, problemas: problemasDetectados } };
 }
 
 /** Aplica una propuesta: reemplaza los turnos del cuadrante (reversible regenerando). */

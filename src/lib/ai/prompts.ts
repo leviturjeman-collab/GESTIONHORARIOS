@@ -265,27 +265,36 @@ Comprueba mentalmente CADA PUNTO antes de escribir el JSON:
 Si alguna respuesta es NO → corrígelo antes de emitir.
 
 ████████████████████████████████████████████████████████████
- PASO 6 — PREGUNTAS AL USUARIO (solo sobre datos ambiguos)
+ PASO 6 — CUESTIONARIO PROFUNDO DE CALIBRACIÓN Y CONFIGURACIÓN
 ████████████████████████████████████████████████████████████
 
-Las preguntas de planificación (horarios, cobertura, días de cierre) se generan automáticamente.
-Tú SOLO debes preguntar sobre AMBIGÜEDADES en los DATOS del documento.
+Debes generar un cuestionario exhaustivo de 15 a 20 preguntas (obligatorio generar muchas) 
+totalmente adaptado al SECTOR de la empresa que has detectado.
+Estas preguntas servirán para configurar el motor matemático de turnos.
 
-{ "pregunta": "...", "opciones": ["A", "B", "C", "D"] }
+CADA pregunta debe tener la siguiente estructura JSON:
+{ 
+  "pregunta": "¿Qué reglas seguimos para...?", 
+  "opciones": ["A", "B", "C"],
+  "tipoUI": "selector_empleados" | "selector_roles" | "curva_demanda" | "texto"
+}
 
-NO preguntes:
-  ✗ Nada que ya hayas extraído del documento
-  ✗ Horarios de apertura/cierre, cobertura, días fuertes (eso lo maneja otro módulo)
-  ✗ Preferencias de planificación genéricas
+■ tipoUI:
+  - "selector_empleados": Si la pregunta trata sobre personas específicas (ej. excepciones, limitaciones, intocables, bajas).
+  - "selector_roles": Si la pregunta trata sobre reglas a nivel de departamento o rol (ej. quién cierra, quién hace turno partido).
+  - "curva_demanda": Si la pregunta trata sobre franjas horarias, carga de trabajo, o picos de estrés durante el día.
+  - "texto": Para cualquier otra pregunta donde necesites una explicación detallada del responsable.
 
-SÍ pregunta (SOLO si detectas ambigüedades reales):
-  ✓ Si un empleado aparece en dos secciones con roles contradictorios → preguntar cuál es el real
-  ✓ Si un nombre aparece en una tabla resumen pero NO en el cuadrante (ej: Cristian) → preguntar su rol
-  ✓ Si un empleado tiene 0 horas trabajadas pero figura en el listado (ej: Adam) → preguntar si está de baja/vacaciones/incorporación
-  ✓ Si las horas de contrato difieren entre dos tablas → preguntar cuál es la correcta
-  ✓ Si "FERNANDO/ANDRES" es un nombre compartido → preguntar si son 1 o 2 personas
+■ EJEMPLOS DE TEMAS A CUBRIR (ADAPTA EL VOCABULARIO AL SECTOR):
+  - Reglas de descanso (ej: ¿Es obligatorio dar 2 días libres seguidos a los celadores?)
+  - Límites de horas extra (ej: ¿Permites programar horas extra en la campaña de Navidad?)
+  - Jerarquías (ej: ¿Quién debe estar siempre presente como responsable de la tienda?)
+  - Empleados intocables (ej: ¿Qué personal tiene disponibilidad limitada por conciliación?)
+  - Turnos partidos (ej: ¿Qué roles aceptan trabajar con turno partido en este hospital?)
+  - Picos de estrés (ej: ¿En qué franja horaria necesitas el 100% de la plantilla en planta?)
+  - Ambigüedades del documento (ej: 'Juan' figura con 0 horas, ¿está de vacaciones?)
 
-Si no hay ambigüedades → devuelve "preguntas": []
+No te limites a preguntas genéricas. Haz que la configuración sea extremadamente detallada.
 
 ████████████████████████████████████████████████████████████
  FORMATO DE SALIDA
