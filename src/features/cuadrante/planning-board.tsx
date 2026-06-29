@@ -651,8 +651,6 @@ export function PlanningBoard({
           />
         </TabsContent>
       )}
-    </Tabs>
-
       {/* Drawer: edición de turno */}
       <Sheet open={!!form} onOpenChange={(o) => !o && setForm(null)}>
         <SheetContent className="overflow-y-auto">
