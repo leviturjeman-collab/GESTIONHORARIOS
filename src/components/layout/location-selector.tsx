@@ -43,10 +43,12 @@ export function LocationSelector({
 
   return (
     <DropdownMenu>
-      <DropdownMenuTrigger className="flex h-9 items-center gap-2 rounded-md border border-input bg-card px-3 text-sm font-medium shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-        <Building2 className="size-4 text-muted-foreground" />
-        <span className="max-w-[12rem] truncate">{nombreActual}</span>
-        <ChevronDown className="size-4 text-muted-foreground" />
+      <DropdownMenuTrigger asChild>
+        <button className="flex h-9 items-center gap-2 rounded-md border border-input bg-card px-3 text-sm font-medium shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+          <Building2 className="size-4 text-muted-foreground" />
+          <span className="max-w-[12rem] truncate">{nombreActual}</span>
+          <ChevronDown className="size-4 text-muted-foreground" />
+        </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         <DropdownMenuLabel>Ubicación</DropdownMenuLabel>

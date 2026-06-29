@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
-import { Plus, Building2, Users, Clock, Sparkles, Pencil, ListChecks } from "lucide-react";
+import { Plus, Building2, Users, Clock, Sparkles, Pencil, ListChecks, CalendarDays } from "lucide-react";
 import { CoberturaEditor } from "@/features/cobertura/cobertura-editor";
 import { requireSesion } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
@@ -81,7 +81,9 @@ export default async function UbicacionesPage() {
                         <Building2 className="size-5" />
                       </div>
                       <div>
-                        <p className="font-semibold">{u.nombre}</p>
+                        <Link href={`/cuadrantes?ubicacion=${u.id}`} className="hover:underline">
+                          <p className="font-semibold text-primary">{u.nombre}</p>
+                        </Link>
                         <p className="text-xs text-muted-foreground">
                           {u.direccion ?? "Sin dirección"}
                         </p>
@@ -126,6 +128,11 @@ export default async function UbicacionesPage() {
                   </div>
                 </CardContent>
                 <div className="flex items-center justify-end gap-1 border-t border-border p-3">
+                  <Link href={`/cuadrantes?ubicacion=${u.id}`}>
+                    <Button variant="ghost" size="sm" className="text-primary hover:text-primary">
+                      <CalendarDays /> Cuadrante
+                    </Button>
+                  </Link>
                   <CoberturaEditor ubicacionId={u.id} coberturas={u.coberturas}>
                     <Button variant="ghost" size="sm">
                       <ListChecks /> Cobertura ({u.coberturas.length})
