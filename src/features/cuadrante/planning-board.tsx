@@ -118,6 +118,7 @@ export function PlanningBoard({
   ubicHoraApertura,
   ubicHoraCierre,
   disponibilidades,
+  esModoTodas,
 }: {
   ubicacionId: string;
   semanaISO: string;
