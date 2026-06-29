@@ -84,59 +84,59 @@ export default async function EmpleadosPage({
             </TableHeader>
             <TableBody>
               {empleados.map((e) => (
-                <TableRow key={e.id}>
-                  <TableCell>
-                    <EmployeeForm ubicaciones={ubicaciones} empleado={e as any}>
-                      <button className="flex w-full items-center gap-3 rounded-md text-left transition-opacity hover:opacity-75 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary">
+                <EmployeeForm key={e.id} ubicaciones={ubicaciones} empleado={e as any}>
+                  <TableRow className="cursor-pointer transition-colors hover:bg-muted/50">
+                    <TableCell>
+                      <div className="flex w-full items-center gap-3 text-left">
                         <Avatar
                           nombre={iniciales(e.nombre, e.apellidos)}
                           color={e.color ?? undefined}
                           size={34}
                         />
                         <div>
-                          <p className="font-medium hover:underline">
+                          <p className="font-medium text-primary">
                             {e.nombre} {e.apellidos}
                           </p>
                           <p className="text-xs text-muted-foreground">{e.email}</p>
                         </div>
-                      </button>
-                    </EmployeeForm>
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="neutral">{etiquetaRol(e.rolFuncional)}</Badge>
-                  </TableCell>
-                  <TableCell className="text-sm text-muted-foreground">
-                    {e.ubicacion?.nombre ?? "—"}
-                  </TableCell>
-                  <TableCell className="text-sm">
-                    {e.contrato ? (
-                      <span className="text-xs">
-                        {etiquetaContrato(e.contrato.tipo)} · {horas(e.contrato.horasSemana)}
-                      </span>
-                    ) : (
-                      "—"
-                    )}
-                  </TableCell>
-                  <TableCell>
-                    {e.pinFichaje ? (
-                      <div className="flex flex-col">
-                        <span className="font-mono text-xs font-bold tracking-widest text-primary">{e.pinFichaje}</span>
-                        {e.email ? <span className="text-[10px] text-muted-foreground">App + Tablet</span> : <span className="text-[10px] text-muted-foreground">Solo Tablet</span>}
                       </div>
-                    ) : (
-                      <span className="text-xs text-muted-foreground">—</span>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-sm tabular-nums">
-                    {e.contrato ? euros(e.contrato.costeHora, true) : "—"}
-                  </TableCell>
-                  <TableCell>
-                    <StatusBadge estado={e.estado} />
-                  </TableCell>
-                  <TableCell>
-                    <EmployeeRowActions empleado={e} ubicaciones={ubicaciones} puedeRgpd={esAdmin(usuario)} />
-                  </TableCell>
-                </TableRow>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="neutral">{etiquetaRol(e.rolFuncional)}</Badge>
+                    </TableCell>
+                    <TableCell className="text-sm text-muted-foreground">
+                      {e.ubicacion?.nombre ?? "—"}
+                    </TableCell>
+                    <TableCell className="text-sm">
+                      {e.contrato ? (
+                        <span className="text-xs">
+                          {etiquetaContrato(e.contrato.tipo)} · {horas(e.contrato.horasSemana)}
+                        </span>
+                      ) : (
+                        "—"
+                      )}
+                    </TableCell>
+                    <TableCell>
+                      {e.pinFichaje ? (
+                        <div className="flex flex-col">
+                          <span className="font-mono text-xs font-bold tracking-widest text-primary">{e.pinFichaje}</span>
+                          {e.email ? <span className="text-[10px] text-muted-foreground">App + Tablet</span> : <span className="text-[10px] text-muted-foreground">Solo Tablet</span>}
+                        </div>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">—</span>
+                      )}
+                    </TableCell>
+                    <TableCell className="text-sm tabular-nums">
+                      {e.contrato ? euros(e.contrato.costeHora, true) : "—"}
+                    </TableCell>
+                    <TableCell>
+                      <StatusBadge estado={e.estado} />
+                    </TableCell>
+                    <TableCell onClick={(ev) => ev.stopPropagation()}>
+                      <EmployeeRowActions empleado={e} ubicaciones={ubicaciones} puedeRgpd={esAdmin(usuario)} />
+                    </TableCell>
+                  </TableRow>
+                </EmployeeForm>
               ))}
             </TableBody>
           </Table>
