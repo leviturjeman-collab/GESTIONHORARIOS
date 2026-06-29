@@ -20,7 +20,7 @@ const genAI = GOOGLE_KEY ? new GoogleGenerativeAI(GOOGLE_KEY) : null;
  * Por defecto usa `gemini-3.5-flash` (verificado disponible en la cuenta).
  */
 export const MODELO_OCR = () =>
-  process.env.GOOGLE_OCR_MODEL?.trim() || "gemini-3.5-flash";
+  process.env.GOOGLE_OCR_MODEL?.trim() || "gemini-1.5-flash";
 
 export type TipoImagen = "image/jpeg" | "image/png" | "image/gif" | "image/webp";
 

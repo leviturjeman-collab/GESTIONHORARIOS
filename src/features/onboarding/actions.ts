@@ -103,39 +103,38 @@ export async function analizarArchivo(formData: FormData): Promise<Resultado<Res
         const buf = Buffer.from(await archivoBlob.arrayBuffer());
         let textoExtraido = "";
 
-        // Intento 1: texto nativo del PDF (pdf-parse v2 → clase PDFParse).
+        // Intento 1: OCR con Gemini (excelente para mantener formato de tablas/cuadrantes)
         try {
-          const { PDFParse } = await import("pdf-parse");
-          const parser = new PDFParse({ data: new Uint8Array(buf) });
-          try {
-            const res = await parser.getText();
-            textoExtraido = res.text || "";
-          } finally {
-            await parser.destroy();
-          }
-          console.log(`[analizarArchivo] PDF texto nativo: ${textoExtraido.length} caracteres`);
-        } catch (pdfErr) {
+          const pdfBase64 = buf.toString("base64");
+          textoExtraido = await extraerTextoDePDF(pdfBase64, {
+            organizacionId: u.organizacionId,
+            operacion: "OCR",
+          });
+          console.log(`[analizarArchivo] OCR del PDF: ${textoExtraido.length} caracteres`);
+        } catch (ocrErr) {
           console.warn(
-            "[analizarArchivo] pdf-parse no pudo extraer texto, se intentará OCR:",
-            pdfErr instanceof Error ? pdfErr.message : String(pdfErr)
+            "[analizarArchivo] OCR del PDF falló, se intentará texto nativo:",
+            ocrErr instanceof Error ? ocrErr.message : String(ocrErr)
           );
         }
 
-        // Intento 2: si hay poco texto, es un PDF escaneado → OCR con Gemini.
-        // Gemini acepta el PDF directamente (application/pdf), sin canvas.
+        // Intento 2: texto nativo del PDF (pdf-parse v2) como fallback
         if (textoExtraido.trim().length < 100) {
-          console.log("[analizarArchivo] PDF con poco texto (¿escaneado?). Probando OCR con Gemini...");
+          console.log("[analizarArchivo] Probando extraer texto nativo con pdf-parse...");
           try {
-            const pdfBase64 = buf.toString("base64");
-            textoExtraido = await extraerTextoDePDF(pdfBase64, {
-              organizacionId: u.organizacionId,
-              operacion: "OCR",
-            });
-            console.log(`[analizarArchivo] OCR del PDF: ${textoExtraido.length} caracteres`);
-          } catch (ocrErr) {
+            const { PDFParse } = await import("pdf-parse");
+            const parser = new PDFParse({ data: new Uint8Array(buf) });
+            try {
+              const res = await parser.getText();
+              textoExtraido = res.text || "";
+            } finally {
+              await parser.destroy();
+            }
+            console.log(`[analizarArchivo] PDF texto nativo: ${textoExtraido.length} caracteres`);
+          } catch (pdfErr) {
             console.error(
-              "[analizarArchivo] OCR del PDF falló:",
-              ocrErr instanceof Error ? ocrErr.message : String(ocrErr)
+              "[analizarArchivo] pdf-parse falló:",
+              pdfErr instanceof Error ? pdfErr.message : String(pdfErr)
             );
           }
         }
