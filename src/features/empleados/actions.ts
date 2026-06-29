@@ -331,3 +331,65 @@ export async function enviarPinPorEmail(empleadoId: string): Promise<Resultado> 
     return fallo(error?.message ?? "Error al enviar el correo");
   }
 }
+
+export async function getResumenHoras(
+  empleadoId: string,
+  mes: string // "YYYY-MM"
+): Promise<Resultado<{ horasContratoMes: number; horasTrabajadas: number; horasExtra: number }>> {
+  const u = await requireResponsable();
+  const emp = await prisma.empleado.findUnique({
+    where: { id: empleadoId },
+    include: { contrato: true },
+  });
+  if (!emp || !(await empleadoEnAmbito(u, emp.id))) return fallo("Empleado no encontrado");
+
+  const [year, month] = mes.split("-").map(Number);
+  const start = new Date(year, month - 1, 1);
+  const end = new Date(year, month, 0, 23, 59, 59, 999);
+
+  const turnos = await prisma.turno.findMany({
+    where: {
+      empleadoId,
+      dia: {
+        gte: start,
+        lte: end,
+      },
+    },
+  });
+
+  let minutosTotales = 0;
+  for (const t of turnos) {
+    const parse = (h: string) => {
+      const [hh, mm] = h.split(":").map(Number);
+      return hh * 60 + mm;
+    };
+    if (t.horaInicio && t.horaFin) {
+      let m = parse(t.horaFin) - parse(t.horaInicio);
+      if (m < 0) m += 24 * 60;
+      minutosTotales += m;
+    }
+    if (t.horaInicio2 && t.horaFin2) {
+      let m = parse(t.horaFin2) - parse(t.horaInicio2);
+      if (m < 0) m += 24 * 60;
+      minutosTotales += m;
+    }
+  }
+
+  // Horas totales programadas en turnos
+  const horasTrabajadas = +(minutosTotales / 60).toFixed(1);
+
+  // Calcular las horas de contrato teóricas del mes
+  const horasSemana = emp.contrato?.horasSemana ?? 40;
+  const horasContratoMes = +(horasSemana * 4.33).toFixed(1);
+
+  const horasExtra = Math.max(0, horasTrabajadas - horasContratoMes);
+
+  return {
+    ok: true,
+    data: {
+      horasContratoMes,
+      horasTrabajadas,
+      horasExtra: +(horasExtra).toFixed(1),
+    },
+  };
+}

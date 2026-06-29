@@ -122,7 +122,7 @@ export async function generarTurnosIA(
         "BLOQUE 1 — REGLAS ABSOLUTAS (NUNCA romper)\n" +
         "═══════════════════════════════════════════════\n" +
         "1. diasNoDisponibles: PROHIBIDO asignar cualquier turno en días indicados como no disponibles.\n" +
-        "2. Ausencias aprobadas: PROHIBIDO asignar turnos en fechas con ausencia.\n" +
+        "2. Ausencias/Bajas: PROHIBIDO asignar turnos en fechas con ausencia (ya sea aprobada o pendiente).\n" +
         "3. permitePartido=false: ese empleado SOLO puede tener turnos continuos (partido=false siempre).\n" +
         "4. admiteHorasExtra=false: ese empleado NO puede superar sus horasContrato en ningún caso.\n" +
         "5. Horario del local: NINGÚN turno puede empezar antes de horaApertura ni terminar después de horaCierre, EXCEPTO limpieza/office que deben entrar 1-2 horas ANTES de apertura.\n" +

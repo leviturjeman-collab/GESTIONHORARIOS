@@ -248,7 +248,7 @@ export async function generarPreviewIA(
     prisma.ausencia.findMany({
       where: {
         empleado: { ubicacionId },
-        estado: "APROBADA",
+        estado: { not: "RECHAZADA" },
         fechaInicio: { lte: dias[6] },
         fechaFin: { gte: dias[0] },
       },

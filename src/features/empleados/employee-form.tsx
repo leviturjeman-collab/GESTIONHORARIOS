@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { toast } from "sonner";
 import { Loader2, KeyRound, RefreshCw, CheckCircle2, Mail } from "lucide-react";
@@ -23,8 +23,71 @@ import {
   SelectItem,
 } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
+import { Tabs, TabsList, TabsTrigger, TabsContent } from "@/components/ui/tabs";
 import { ROLES_FUNCIONALES, etiquetaRol, TIPOS_CONTRATO, etiquetaContrato } from "@/lib/enums";
-import { crearEmpleado, actualizarEmpleado, regenerarPin, enviarPinPorEmail } from "@/features/empleados/actions";
+import { crearEmpleado, actualizarEmpleado, regenerarPin, enviarPinPorEmail, getResumenHoras } from "@/features/empleados/actions";
+import { cn } from "@/lib/utils";
+
+function ControlHorarioPanel({ empleadoId }: { empleadoId: string }) {
+  const [mes, setMes] = useState(() => {
+    const d = new Date();
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}`;
+  });
+  const [datos, setDatos] = useState<{ horasContratoMes: number; horasTrabajadas: number; horasExtra: number } | null>(null);
+  const [cargando, setCargando] = useState(false);
+
+  async function cargar() {
+    setCargando(true);
+    const res = await getResumenHoras(empleadoId, mes);
+    setCargando(false);
+    if (res.ok && res.data) setDatos(res.data);
+  }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { cargar(); }, [mes, empleadoId]);
+
+  return (
+    <div className="space-y-4 p-5 pt-2">
+      <div className="flex items-end gap-3">
+        <div className="flex-1 space-y-1.5">
+          <Label>Mes</Label>
+          <Input type="month" value={mes} onChange={(e) => setMes(e.target.value)} />
+        </div>
+        <Button variant="outline" size="icon" onClick={cargar} disabled={cargando}>
+          <RefreshCw className={cn("size-4", cargando && "animate-spin")} />
+        </Button>
+      </div>
+      
+      {datos ? (
+        <div className="space-y-3">
+          <div className="rounded-xl border border-border bg-card p-4 space-y-3 shadow-sm">
+            <div className="flex justify-between items-center pb-3 border-b border-border">
+              <span className="text-sm font-medium text-muted-foreground">Horas según contrato</span>
+              <span className="font-mono text-base font-semibold">{datos.horasContratoMes}h</span>
+            </div>
+            <div className="flex justify-between items-center pb-3 border-b border-border">
+              <span className="text-sm font-medium text-muted-foreground">Horas programadas (Total)</span>
+              <span className="font-mono text-base font-semibold">{datos.horasTrabajadas}h</span>
+            </div>
+            <div className="flex justify-between items-center pt-1">
+              <span className="text-sm font-bold">Horas extra estimadas</span>
+              <span className={cn("font-mono text-lg font-bold", datos.horasExtra > 0 ? "text-danger" : "text-success")}>
+                {datos.horasExtra > 0 ? "+" : ""}{datos.horasExtra}h
+              </span>
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground text-center">
+            Calculado en base a los turnos asignados en el calendario de este mes vs la jornada teórica semanal ({datos.horasContratoMes}h/mes = horas de contrato × 4.33 semanas).
+          </p>
+        </div>
+      ) : (
+        <div className="h-32 flex items-center justify-center text-muted-foreground text-sm">
+          {cargando ? "Calculando horas..." : "No hay datos"}
+        </div>
+      )}
+    </div>
+  );
+}
 
 type Ubic = { id: string; nombre: string };
 type EmpleadoEdit = {
@@ -175,121 +238,236 @@ export function EmployeeForm({
             </Button>
           </div>
         ) : (
-          <div className="space-y-4 p-5">
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Nombre</Label>
-                <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Apellidos</Label>
-                <Input value={form.apellidos} onChange={(e) => set("apellidos", e.target.value)} />
-              </div>
-            </div>
+          empleado ? (
+            <Tabs defaultValue="datos" className="mt-4">
+              <TabsList className="grid w-full grid-cols-2 mx-5 mb-2 max-w-[calc(100%-40px)]">
+                <TabsTrigger value="datos">Datos y Contrato</TabsTrigger>
+                <TabsTrigger value="horas">Control Horario</TabsTrigger>
+              </TabsList>
+              <TabsContent value="datos">
+                <div className="space-y-4 p-5 pt-2">
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Nombre</Label>
+                      <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Apellidos</Label>
+                      <Input value={form.apellidos} onChange={(e) => set("apellidos", e.target.value)} />
+                    </div>
+                  </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Correo</Label>
-                <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Teléfono</Label>
-                <Input value={form.telefono} onChange={(e) => set("telefono", e.target.value)} />
-              </div>
-            </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Correo</Label>
+                      <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Teléfono</Label>
+                      <Input value={form.telefono} onChange={(e) => set("telefono", e.target.value)} />
+                    </div>
+                  </div>
 
-            <div className="space-y-1.5">
-              <Label>PIN de acceso (4 dígitos)</Label>
-              <div className="flex gap-2">
-                <Input
-                  value={form.pinFichaje}
-                  onChange={(e) => set("pinFichaje", e.target.value.replace(/\D/g, "").slice(0, 4))}
-                  placeholder="Ej: 1234 (Vacío = aleatorio)"
-                  maxLength={4}
-                  className="font-mono tracking-widest"
-                />
-                {empleado && (
-                  <>
-                    <Button variant="outline" size="icon" onClick={regenerar} disabled={regenerando || enviando} type="button" title="Generar PIN aleatorio">
-                      {regenerando ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                  <div className="space-y-1.5">
+                    <Label>PIN de acceso (4 dígitos)</Label>
+                    <div className="flex gap-2">
+                      <Input
+                        value={form.pinFichaje}
+                        onChange={(e) => set("pinFichaje", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                        placeholder="Ej: 1234 (Vacío = aleatorio)"
+                        maxLength={4}
+                        className="font-mono tracking-widest"
+                      />
+                      {empleado && (
+                        <>
+                          <Button variant="outline" size="icon" onClick={regenerar} disabled={regenerando || enviando} type="button" title="Generar PIN aleatorio">
+                            {regenerando ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
+                          </Button>
+                          <Button variant="outline" size="icon" onClick={enviarPin} disabled={enviando || regenerando || !form.email || !form.pinFichaje} type="button" title="Enviar PIN por correo">
+                            {enviando ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-muted-foreground">
+                      El empleado inicia sesión con su correo y este PIN. {empleado ? "Si lo cambias, se actualizará al guardar." : "Dejar en blanco para generarlo automáticamente."}
+                    </p>
+                  </div>
+
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Rol funcional</Label>
+                      <Select value={form.rolFuncional} onValueChange={(v) => set("rolFuncional", v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {ROLES_FUNCIONALES.map((r) => (
+                            <SelectItem key={r} value={r}>{etiquetaRol(r)}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Ubicación</Label>
+                      <Select value={form.ubicacionId} onValueChange={(v) => set("ubicacionId", v)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {ubicaciones.map((u) => (
+                            <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Tipo de contrato</Label>
+                    <Select value={form.tipo} onValueChange={(v) => set("tipo", v)}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {TIPOS_CONTRATO.map((t) => (
+                          <SelectItem key={t} value={t}>{etiquetaContrato(t)}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div className="space-y-1.5">
+                      <Label>Horas/sem.</Label>
+                      <Input type="number" value={form.horasSemana} onChange={(e) => set("horasSemana", e.target.value)} />
+                    </div>
+                    <div className="space-y-1.5">
+                      <Label>Coste/hora</Label>
+                      <Input type="number" step="0.5" value={form.costeHora} onChange={(e) => set("costeHora", e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="flex items-center justify-between rounded-md border border-border p-3">
+                    <Label>Admite horas extra</Label>
+                    <Switch checked={form.admiteHorasExtra} onCheckedChange={(v) => set("admiteHorasExtra", v)} />
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <Label>Saldo de vacaciones (días/año)</Label>
+                    <Input type="number" value={form.saldoVacaciones} onChange={(e) => set("saldoVacaciones", e.target.value)} />
+                  </div>
+                  
+                  <div className="border-t border-border mt-4 pt-4 flex items-center justify-between">
+                    <p className="text-xs text-muted-foreground">Revisa antes de guardar</p>
+                    <Button onClick={guardar} disabled={cargando}>
+                      {cargando && <Loader2 className="mr-2 size-4 animate-spin" />}
+                      Guardar cambios
                     </Button>
-                    <Button variant="outline" size="icon" onClick={enviarPin} disabled={enviando || regenerando || !form.email || !form.pinFichaje} type="button" title="Enviar PIN por correo">
-                      {enviando ? <Loader2 className="size-4 animate-spin" /> : <Mail className="size-4" />}
-                    </Button>
-                  </>
-                )}
+                  </div>
+                </div>
+              </TabsContent>
+              <TabsContent value="horas">
+                <ControlHorarioPanel empleadoId={empleado.id} />
+              </TabsContent>
+            </Tabs>
+          ) : (
+            <div className="space-y-4 p-5 pt-2">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Nombre</Label>
+                  <Input value={form.nombre} onChange={(e) => set("nombre", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Apellidos</Label>
+                  <Input value={form.apellidos} onChange={(e) => set("apellidos", e.target.value)} />
+                </div>
               </div>
-              <p className="text-[11px] text-muted-foreground">
-                El empleado inicia sesión con su correo y este PIN. {empleado ? "Si lo cambias, se actualizará al guardar." : "Dejar en blanco para generarlo automáticamente."}
-              </p>
-            </div>
 
-            <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Correo</Label>
+                  <Input type="email" value={form.email} onChange={(e) => set("email", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Teléfono</Label>
+                  <Input value={form.telefono} onChange={(e) => set("telefono", e.target.value)} />
+                </div>
+              </div>
+
               <div className="space-y-1.5">
-                <Label>Rol funcional</Label>
-                <Select value={form.rolFuncional} onValueChange={(v) => set("rolFuncional", v)}>
+                <Label>PIN de acceso (4 dígitos)</Label>
+                <div className="flex gap-2">
+                  <Input
+                    value={form.pinFichaje}
+                    onChange={(e) => set("pinFichaje", e.target.value.replace(/\D/g, "").slice(0, 4))}
+                    placeholder="Ej: 1234 (Vacío = aleatorio)"
+                    maxLength={4}
+                    className="font-mono tracking-widest"
+                  />
+                </div>
+                <p className="text-[11px] text-muted-foreground">
+                  El empleado inicia sesión con su correo y este PIN. Dejar en blanco para generarlo automáticamente.
+                </p>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Rol funcional</Label>
+                  <Select value={form.rolFuncional} onValueChange={(v) => set("rolFuncional", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ROLES_FUNCIONALES.map((r) => (
+                        <SelectItem key={r} value={r}>{etiquetaRol(r)}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Ubicación</Label>
+                  <Select value={form.ubicacionId} onValueChange={(v) => set("ubicacionId", v)}>
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {ubicaciones.map((u) => (
+                        <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </div>
+
+              <div className="space-y-1.5">
+                <Label>Tipo de contrato</Label>
+                <Select value={form.tipo} onValueChange={(v) => set("tipo", v)}>
                   <SelectTrigger><SelectValue /></SelectTrigger>
                   <SelectContent>
-                    {ROLES_FUNCIONALES.map((r) => (
-                      <SelectItem key={r} value={r}>{etiquetaRol(r)}</SelectItem>
+                    {TIPOS_CONTRATO.map((t) => (
+                      <SelectItem key={t} value={t}>{etiquetaContrato(t)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1.5">
+                  <Label>Horas/sem.</Label>
+                  <Input type="number" value={form.horasSemana} onChange={(e) => set("horasSemana", e.target.value)} />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>Coste/hora</Label>
+                  <Input type="number" step="0.5" value={form.costeHora} onChange={(e) => set("costeHora", e.target.value)} />
+                </div>
+              </div>
+              <div className="flex items-center justify-between rounded-md border border-border p-3">
+                <Label>Admite horas extra</Label>
+                <Switch checked={form.admiteHorasExtra} onCheckedChange={(v) => set("admiteHorasExtra", v)} />
+              </div>
+
               <div className="space-y-1.5">
-                <Label>Ubicación</Label>
-                <Select value={form.ubicacionId} onValueChange={(v) => set("ubicacionId", v)}>
-                  <SelectTrigger><SelectValue /></SelectTrigger>
-                  <SelectContent>
-                    {ubicaciones.map((u) => (
-                      <SelectItem key={u.id} value={u.id}>{u.nombre}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <Label>Saldo de vacaciones (días/año)</Label>
+                <Input type="number" value={form.saldoVacaciones} onChange={(e) => set("saldoVacaciones", e.target.value)} />
+              </div>
+
+              <div className="border-t border-border mt-4 pt-4 flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">Revisa antes de crear</p>
+                <Button onClick={guardar} disabled={cargando}>
+                  {cargando && <Loader2 className="mr-2 size-4 animate-spin" />}
+                  Crear empleado
+                </Button>
               </div>
             </div>
-
-            <div className="space-y-1.5">
-              <Label>Tipo de contrato</Label>
-              <Select value={form.tipo} onValueChange={(v) => set("tipo", v)}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {TIPOS_CONTRATO.map((t) => (
-                    <SelectItem key={t} value={t}>{etiquetaContrato(t)}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div className="space-y-1.5">
-                <Label>Horas/sem.</Label>
-                <Input type="number" value={form.horasSemana} onChange={(e) => set("horasSemana", e.target.value)} />
-              </div>
-              <div className="space-y-1.5">
-                <Label>Coste/hora</Label>
-                <Input type="number" step="0.5" value={form.costeHora} onChange={(e) => set("costeHora", e.target.value)} />
-              </div>
-            </div>
-            <div className="flex items-center justify-between rounded-md border border-border p-3">
-              <Label>Admite horas extra</Label>
-              <Switch checked={form.admiteHorasExtra} onCheckedChange={(v) => set("admiteHorasExtra", v)} />
-            </div>
-
-            <div className="space-y-1.5">
-              <Label>Saldo de vacaciones (días/año)</Label>
-              <Input type="number" value={form.saldoVacaciones} onChange={(e) => set("saldoVacaciones", e.target.value)} />
-            </div>
-
-            <div className="flex justify-end gap-2 pt-2">
-              <Button variant="outline" onClick={() => cerrar(false)} type="button">
-                Cancelar
-              </Button>
-              <Button onClick={guardar} disabled={cargando}>
-                {cargando && <Loader2 className="animate-spin" />}
-                {empleado ? "Guardar cambios" : "Crear empleado"}
-              </Button>
-            </div>
-          </div>
+          )
         )}
       </SheetContent>
     </Sheet>
