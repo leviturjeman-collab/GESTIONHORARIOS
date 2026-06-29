@@ -10,6 +10,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu";
+import { Button } from "@/components/ui/button";
 
 type Ubic = { id: string; nombre: string };
 
@@ -44,11 +45,13 @@ export function LocationSelector({
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button className="flex h-9 items-center gap-2 rounded-md border border-input bg-card px-3 text-sm font-medium shadow-sm hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-          <Building2 className="size-4 text-muted-foreground" />
-          <span className="max-w-[12rem] truncate">{nombreActual}</span>
-          <ChevronDown className="size-4 text-muted-foreground" />
-        </button>
+        <Button variant="outline" className="h-9 w-[200px] justify-between px-3">
+          <div className="flex items-center gap-2 truncate">
+            <Building2 className="size-4 shrink-0 text-muted-foreground" />
+            <span className="truncate">{nombreActual}</span>
+          </div>
+          <ChevronDown className="size-4 shrink-0 opacity-50" />
+        </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start">
         <DropdownMenuLabel>Ubicación</DropdownMenuLabel>
